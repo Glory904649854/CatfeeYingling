@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">应灵</string>
+    <string name="app_tagline">YINGLING · ON-DEVICE LIVE CAPTION</string>
+
+    <string name="channel_name">监听会话</string>
+    <string name="channel_desc">应灵在后台捕获并翻译应用音频时显示</string>
+
+    <string name="notif_running_title">应灵 · 正在监听</string>
+    <string name="notif_paused_title">应灵 · 已暂停</string>
+    <string name="notif_action_pause">暂停</string>
+    <string name="notif_action_resume">继续</string>
+    <string name="notif_action_stop">停止</string>
+    <string name="notif_scope_all">全部媒体应用</string>
+    <string name="notif_scope_apps">监听 %1$d 个应用</string>
+
+    <string name="error_no_mic">缺少录音权限，无法捕获音频</string>
+    <string name="error_capture_failed">音频采集启动失败：目标应用可能禁止被录制</string>
+    <string name="error_no_overlay">未授予悬浮窗权限，字幕无法显示在其他应用上方</string>
+</resources>
