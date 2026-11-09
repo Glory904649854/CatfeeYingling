@@ -265,7 +265,7 @@ private fun Header(status: SessionStatus) {
                 )
                 Spacer(Modifier.width(7.dp))
                 Text(
-                    text = "YINGLING · ON-DEVICE LIVE CAPTION",
+                    text = "YINGLING · LIVE CAPTION",
                     color = TextTertiary,
                     fontSize = 8.5f.sp,
                     letterSpacing = 1.6f.sp,
