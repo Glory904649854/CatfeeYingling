@@ -61,7 +61,11 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                     .padding(bottom = padding.calculateBottomPadding()),
             ) {
                 when (tab) {
-                    0 -> HomeScreen(vm, onOpenApps = { tab = 1 })
+                    0 -> HomeScreen(
+                        vm,
+                        onOpenApps = { tab = 1 },
+                        onOpenSettings = { tab = 2 },
+                    )
                     1 -> AppsScreen(vm)
                     else -> SettingsScreen(vm)
                 }

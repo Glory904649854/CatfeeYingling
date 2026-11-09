@@ -4,8 +4,11 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,11 +40,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.service.RecognitionService
 import com.catfee.yingling.ui.components.HairLine
+import com.catfee.yingling.ui.components.ModelSetupCard
 import com.catfee.yingling.ui.components.SectionCard
 import com.catfee.yingling.ui.components.SectionTitle
+import com.catfee.yingling.ui.components.TagChip
 import com.catfee.yingling.ui.theme.BorderDark
 import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.SurfaceHigh
@@ -49,6 +55,7 @@ import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
 import com.catfee.yingling.ui.theme.TextTertiary
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
     val context = LocalContext.current
@@ -122,6 +129,10 @@ fun SettingsScreen(vm: MainViewModel) {
                 onClick = { planned() },
             )
         }
+
+        Spacer(Modifier.height(14.dp))
+
+        ModelSetupCard(vm, alwaysShow = true)
 
         Spacer(Modifier.height(14.dp))
 
@@ -249,6 +260,47 @@ fun SettingsScreen(vm: MainViewModel) {
                     ),
                 )
             }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        SectionCard {
+            SectionTitle("字幕显示")
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "每句停留",
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "${vm.subtitleHoldSeconds} 秒",
+                    color = Cyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Prefs.SUBTITLE_HOLD_OPTIONS.forEach { seconds ->
+                    TagChip(
+                        text = "${seconds}秒",
+                        selected = vm.subtitleHoldSeconds == seconds,
+                        onClick = { vm.selectSubtitleHold(seconds) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "超时后渐隐移除；数值越大，上一句保留越久。",
+                color = TextTertiary,
+                fontSize = 10.5.sp,
+                lineHeight = 15.sp,
+            )
         }
 
         Spacer(Modifier.height(14.dp))

@@ -91,6 +91,9 @@ class RecognitionService : Service() {
             ACTION_RESUME -> if (running) setPaused(false)
             ACTION_STOP -> stopSession()
             ACTION_TOGGLE_OVERLAY -> toggleOverlay()
+            ACTION_UPDATE_SUBTITLE -> {
+                overlay?.setHoldMs(prefs.subtitleHoldSeconds * 1000L)
+            }
             ACTION_REFRESH -> if (running) refreshConfiguration() else stopSelf()
             else -> if (!running) stopSelf()
         }
@@ -553,6 +556,7 @@ class RecognitionService : Service() {
         const val ACTION_STOP = "com.catfee.yingling.action.STOP"
         const val ACTION_REFRESH = "com.catfee.yingling.action.REFRESH"
         const val ACTION_TOGGLE_OVERLAY = "com.catfee.yingling.action.TOGGLE_OVERLAY"
+        const val ACTION_UPDATE_SUBTITLE = "com.catfee.yingling.action.UPDATE_SUBTITLE"
 
         private const val CHANNEL_ID = "yingling_session"
         private const val NOTIFICATION_ID = 1001
@@ -583,6 +587,8 @@ class RecognitionService : Service() {
         fun refresh(context: Context) = send(context, ACTION_REFRESH)
 
         fun toggleOverlay(context: Context) = send(context, ACTION_TOGGLE_OVERLAY)
+
+        fun updateSubtitleHold(context: Context) = send(context, ACTION_UPDATE_SUBTITLE)
 
         private fun send(context: Context, action: String) {
             runCatching {

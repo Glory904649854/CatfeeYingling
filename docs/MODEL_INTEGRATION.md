@@ -1,5 +1,7 @@
 # 模型接入与调优
 
+> 现在模型由 App 自动下载：设置 → 离线模型。以下手动路径仅用于开发调试。
+
 当前实现：
 
 ```
@@ -13,6 +15,8 @@ sherpa-onnx Streaming Zipformer（中英双语）
 - `engine/SherpaStreamingEngine.kt`：ASR partial、断句、翻译调度
 - `engine/QwenBridge.kt` + `cpp/llama_jni.cpp`：llama.cpp JNI
 - `engine/ModelStore.kt`：模型路径查找
+- `engine/ModelCatalog.kt` + `ModelDownloader.kt`：模型清单与下载
+- `service/ModelDownloadService.kt`：下载前台服务
 - `service/RecognitionService.kt`：按目标语言选择引擎
 
 ---

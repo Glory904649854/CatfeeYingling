@@ -9,7 +9,8 @@
 
 - **系统音频采集**：`AudioPlaybackCapture` + 一次 `MediaProjection` 授权（仅取音频，不录屏）。
 - **按应用监听**：多选应用，按 UID 精确捕获；也可切到「全部媒体」按类型捕获。
-- **悬浮字幕窗**：紧凑布局，保留最近 3 句的「原文 + 译文」，新句滑入；每句停留 6 秒后渐隐移除，不会长期占屏，可滚动回看。
+- **悬浮字幕窗**：紧凑布局，保留最近 3 句的「原文 + 译文」，新句滑入；每句停留时长可在设置中选 6/10/15/20/30 秒（默认 10 秒），超时后渐隐移除，不会长期占屏，可滚动回看。
+- **模型自动下载**：首次使用在设置页下载，Wi‑Fi 下自动开始；通知栏和设置页显示总进度、当前文件、速度与剩余时间，支持断点续传，完成后自动启用。
 - **流式 ASR**：中文/英文用 sherpa-onnx 流式 zipformer；日/韩/英用 SenseVoice 离线多语种识别。
 - **逐句翻译**：默认 Qwen2.5-0.5B-Instruct（llama.cpp）；可在设置中开启云端 LLM（自定义 Base URL / Key / 模型），云端失败自动回退本地。支持目标中文或英文；日/韩/英 → 中、中 → 英。
 - **AI Studio 风格本体**：深海军蓝底、亮青→宝蓝渐变、22dp 圆角、三页导航；应用图标与整体配色取自项目 LOGO。
@@ -45,28 +46,27 @@ gradlew.bat assembleDebug
 - 原生代码强制 `-O3` 并启用 ARMv8.2 `dotprod+fp16`；debug 包也能跑出可用速度。
 - APK 输出：`app/build/outputs/apk/debug/app-debug.apk`。
 
-## 4. 模型（不入库，需手动放入手机）
+## 4. 模型（应用内自动下载）
 
-| 模型 | 大小 | 放置路径 |
+首次使用时，打开 **设置 → 离线模型**：
+
+- Wi‑Fi 下会自动开始下载；移动网络下需要点一下确认，避免误耗流量。
+- 设置页显示总进度条、当前文件、已下载大小、速度和剩余时间；通知栏同步显示。
+- 下载使用 `.part` 临时文件，可中断后续传；全部完成后自动启用，无需电脑。
+- 总大小约 **1.01 GB**（7 个文件）。
+
+| 模型 | 大小 | 路径 |
 |---|---|---|
 | sherpa zipformer 中英双语 | encoder 330MB + decoder 14MB + joiner 13MB + tokens | `models/sherpa-zh-en/` |
 | SenseVoice 多语种（中英日韩粤） | 239MB + tokens | `models/sensevoice/` |
 | Qwen2.5-0.5B-Instruct Q4_K_M | 约 491MB | `models/qwen2.5-0.5b-instruct-q4_k_m.gguf` |
 
-```bash
-adb shell mkdir -p /sdcard/Android/data/com.catfee.yingling/files/models/sherpa-zh-en
-adb push sherpa-zh-en/. /sdcard/Android/data/com.catfee.yingling/files/models/sherpa-zh-en/
-
-adb shell mkdir -p /sdcard/Android/data/com.catfee.yingling/files/models/sensevoice
-adb push sensevoice/. /sdcard/Android/data/com.catfee.yingling/files/models/sensevoice/
-
-adb push qwen2.5-0.5b-instruct-q4_k_m.gguf /sdcard/Android/data/com.catfee.yingling/files/models/
-```
-
-模型来源：
+模型来源（应用内通过 hf-mirror 下载）：
 - sherpa zipformer：<https://hf-mirror.com/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20>
 - SenseVoice：<https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17>
 - Qwen：<https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct-GGUF>
+
+> 调试时也可以手动把模型放到上表路径；正常使用不需要 adb push。
 
 ## 5. 云端 LLM 翻译（可选）
 
@@ -88,7 +88,7 @@ adb push qwen2.5-0.5b-instruct-q4_k_m.gguf /sdcard/Android/data/com.catfee.yingl
 - 英 → 中：SenseVoice 识别英语（6.4s 音频）→ 本地 Qwen 中文，翻译约 1.5s；DeepSeek 云端约 0.7s。
 - 中 → 英：流式 zipformer + Qwen，15~19 字约 1.5~1.8s。
 - 字幕节奏：每 3 秒断句一次，译文延迟约 **1.5~3 秒**；从开口算约 4~6 秒。
-- 悬浮窗：已去掉声浪，默认高度约为原来的 60%，长句可滚动完整查看；每句停留 6 秒后渐隐。
+- 悬浮窗：已去掉声浪，默认高度约为原来的 60%，长句可滚动完整查看；停留时长默认 10 秒，可在设置调整。
 - 内存：约 1.2GB（ASR 330MB / SenseVoice 239MB + Qwen 491MB + 运行时）。
 
 > 云端测试说明：测试手机当时没有默认数据网络，因此通过 `adb reverse` 将请求转发到
@@ -103,7 +103,7 @@ adb push qwen2.5-0.5b-instruct-q4_k_m.gguf /sdcard/Android/data/com.catfee.yingl
 - 当前端到端支持：**中 → 英、英 → 中、日 → 中、韩 → 中**；法/俄语音识别暂未接入。
 - 日/韩译文质量受 0.5B 模型限制，偏生硬；追求质量可开启云端 LLM。
 - 云端模式需要网络；无网络时自动回退本地，不会中断字幕。
-- 模型文件需手动放置，未内置下载器。
+- 首次使用需下载约 1.01GB 模型，建议在 Wi‑Fi 下完成。
 - 长时间运行会发热、耗电；中端机建议插电使用。
 - 被采集应用设置 `allowAudioPlaybackCapture=false`、使用 DRM 或通话音频时无法采集。
 - Android 14+ 前台服务必须从可见界面启动；MIUI 对悬浮窗权限有额外管控。
@@ -113,8 +113,8 @@ adb push qwen2.5-0.5b-instruct-q4_k_m.gguf /sdcard/Android/data/com.catfee.yingl
 ```
 app/src/main/java/com/catfee/yingling/
   audio/      AudioPlaybackCapture + 重采样 + 电平
-  engine/     sherpa 流式引擎、SenseVoice、Qwen JNI、云端 Translator、模型查找
-  service/    前台服务 + 悬浮窗
+  engine/     Sherpa/SenseVoice、Qwen JNI、模型目录与下载器
+  service/    前台服务 + 悬浮窗 + 模型下载服务
   ui/         Compose 三页与主题
 app/src/main/cpp/
   llama_jni.cpp  Qwen 推理 JNI

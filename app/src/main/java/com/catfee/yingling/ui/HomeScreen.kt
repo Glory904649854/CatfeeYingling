@@ -85,6 +85,7 @@ import kotlinx.coroutines.flow.StateFlow
 fun HomeScreen(
     vm: MainViewModel,
     onOpenApps: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val status by vm.status.collectAsStateWithLifecycle()
@@ -209,6 +210,7 @@ fun HomeScreen(
             cloudEnabled = vm.cloudEnabled,
             onSelect = vm::selectSourceLang,
             onSelectTarget = vm::selectTargetLang,
+            onOpenSettings = onOpenSettings,
         )
 
         Spacer(Modifier.height(14.dp))
@@ -390,6 +392,7 @@ private fun DirectionCard(
     cloudEnabled: Boolean,
     onSelect: (String) -> Unit,
     onSelectTarget: (String) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     SectionCard {
         SectionTitle("翻译方向") {
@@ -451,12 +454,23 @@ private fun DirectionCard(
 
         if (!fastReady && !(targetLang == "zh" && (sourceLang == "fr" || sourceLang == "ru"))) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = "未检测到对应的 ASR 模型或翻译模型，启动后会回退到演示引擎",
-                color = Warning,
-                fontSize = 10f.sp,
-                lineHeight = 15.sp,
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "离线模型未就绪，下载后自动启用",
+                    color = Warning,
+                    fontSize = 10f.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "去设置",
+                    color = Cyan,
+                    fontSize = 10.5f.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable(onClick = onOpenSettings),
+                )
+            }
         }
     }
 }

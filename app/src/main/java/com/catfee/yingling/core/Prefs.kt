@@ -59,9 +59,18 @@ class Prefs(context: Context) {
             sp.edit().putString(KEY_CLOUD_MODEL, value).apply()
         }
 
+    /** 每句字幕在悬浮窗停留的秒数，超时后渐隐。 */
+    var subtitleHoldSeconds: Int
+        get() = sp.getInt(KEY_SUBTITLE_HOLD, 10).coerceIn(4, 60)
+        set(value) {
+            sp.edit().putInt(KEY_SUBTITLE_HOLD, value.coerceIn(4, 60)).apply()
+        }
+
     companion object {
         const val MODE_APPS = "apps"
         const val MODE_ALL = "all"
+
+        val SUBTITLE_HOLD_OPTIONS = listOf(6, 10, 15, 20, 30)
 
         private const val KEY_APPS = "selected_packages"
         private const val KEY_MODE = "listen_mode"
@@ -71,5 +80,6 @@ class Prefs(context: Context) {
         private const val KEY_CLOUD_BASE_URL = "cloud_base_url"
         private const val KEY_CLOUD_API_KEY = "cloud_api_key"
         private const val KEY_CLOUD_MODEL = "cloud_model"
+        private const val KEY_SUBTITLE_HOLD = "subtitle_hold_seconds"
     }
 }

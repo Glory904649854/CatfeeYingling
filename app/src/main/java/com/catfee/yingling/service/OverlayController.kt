@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -15,6 +16,7 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.core.SubtitleLine
 import kotlin.math.abs
@@ -22,7 +24,7 @@ import kotlin.math.min
 
 /**
  * 紧凑悬浮窗：保留最近几句“原文 + 译文”，新句滑入，
- * 每句停留 6 秒后渐隐移除，不会一直堆在窗口上。
+ * 每句停留时长由设置决定，超时后渐隐移除。
  */
 class OverlayController(
     private val context: Context,
@@ -51,6 +53,7 @@ class OverlayController(
     private var lastLineKey = ""
     private var currentLive = ""
     private var collapsed = false
+    private var holdMs = Prefs(context).subtitleHoldSeconds * 1000L
 
     val isShowing: Boolean get() = root != null
 
@@ -132,6 +135,19 @@ class OverlayController(
     }
 
     fun setScope(scopeLabel: String) = Unit
+
+    /** 设置页修改停留时长后，立即重排已有字幕的渐隐时间。 */
+    fun setHoldMs(value: Long) {
+        val next = value.coerceAtLeast(1_000L)
+        if (next == holdMs) return
+        holdMs = next
+        val now = SystemClock.elapsedRealtime()
+        entries.forEach { entry ->
+            entry.view.removeCallbacks(entry.fade)
+            val remaining = (entry.createdAt + holdMs - now).coerceAtLeast(0L)
+            entry.view.postDelayed(entry.fade, remaining)
+        }
+    }
 
     fun setStatus(status: SessionStatus) {
         val color = when (status) {
@@ -310,9 +326,10 @@ class OverlayController(
             entry.animate().alpha(1f).translationY(0f).setDuration(240).start()
         }
 
+        val createdAt = SystemClock.elapsedRealtime()
         val fade = Runnable { fadeOut(entry) }
-        entry.postDelayed(fade, HOLD_MS)
-        entries.add(Entry(entry, fade))
+        entry.postDelayed(fade, holdMs)
+        entries.add(Entry(entry, fade, createdAt))
     }
 
     private fun fadeOut(view: View) {
@@ -462,7 +479,7 @@ class OverlayController(
             setColor(color)
         }
 
-    private data class Entry(val view: View, val fade: Runnable)
+    private data class Entry(val view: View, val fade: Runnable, val createdAt: Long)
 
     private class MaxScrollView(context: Context, private val maxHeightPx: Int) : ScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -486,7 +503,6 @@ class OverlayController(
     private companion object {
         const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
         const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
-        const val HOLD_MS = 6_000L
         const val FADE_MS = 650L
     }
 }

@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 可选的云端 LLM 翻译 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 模型自动下载前台服务 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- 播放采集本身不依赖麦克风硬件 -->
     <uses-feature
@@ -54,6 +57,11 @@
             android:name=".service.RecognitionService"
             android:exported="false"
             android:foregroundServiceType="microphone|mediaProjection" />
+
+        <service
+            android:name=".service.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>

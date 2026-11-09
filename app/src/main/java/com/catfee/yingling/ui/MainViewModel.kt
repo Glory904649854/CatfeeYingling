@@ -12,8 +12,12 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.data.AppCatalog
 import com.catfee.yingling.data.AppEntry
+import com.catfee.yingling.engine.ModelCatalog
+import com.catfee.yingling.engine.ModelDownloader
 import com.catfee.yingling.engine.ModelStore
+import com.catfee.yingling.service.ModelDownloadService
 import com.catfee.yingling.service.RecognitionService
+import com.catfee.yingling.util.NetworkStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,8 +47,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var cloudModel by mutableStateOf(prefs.cloudModel)
         private set
+    var subtitleHoldSeconds by mutableStateOf(prefs.subtitleHoldSeconds)
+        private set
     var fastReady by mutableStateOf(false)
         private set
+    var modelsReady by mutableStateOf(false)
+        private set
+    var modelMissingBytes by mutableStateOf(0L)
+        private set
+    var modelMissingCount by mutableStateOf(0)
+        private set
+    var modelStatusLoaded by mutableStateOf(false)
+        private set
+
+    val downloadState = ModelDownloader.state
 
     val status = AppState.status
     val direction = AppState.direction
@@ -65,6 +81,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             refreshReady()
         }
+        refreshModelStatus()
+        viewModelScope.launch {
+            var wasCompleted = false
+            ModelDownloader.state.collect { state ->
+                if (state.completed && !wasCompleted) {
+                    wasCompleted = true
+                    refreshModelStatus()
+                    if (isSessionActive()) RecognitionService.refresh(context)
+                } else if (!state.completed) {
+                    wasCompleted = false
+                }
+            }
+        }
+    }
+
+    fun refreshModelStatus() {
+        viewModelScope.launch {
+            val missing = withContext(Dispatchers.IO) { ModelCatalog.missing(context) }
+            modelsReady = missing.isEmpty()
+            modelMissingBytes = missing.sumOf { it.remainingBytes }
+            modelMissingCount = missing.size
+            modelStatusLoaded = true
+            refreshReady()
+            if (missing.isNotEmpty()) {
+                maybeAutoDownload()
+            }
+        }
+    }
+
+    private fun maybeAutoDownload() {
+        val state = ModelDownloader.state.value
+        if (state.running || state.canceled || state.error != null) return
+        if (NetworkStatus.isUnmetered(context)) {
+            ModelDownloadService.start(context)
+        }
+    }
+
+    fun startModelDownload() {
+        ModelDownloadService.start(context)
+    }
+
+    fun cancelModelDownload() {
+        ModelDownloadService.cancel(context)
     }
 
     private fun refreshReady() {
@@ -160,6 +219,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun updateCloudModel(value: String) {
         cloudModel = value
         prefs.cloudModel = value
+    }
+
+    fun selectSubtitleHold(seconds: Int) {
+        val next = seconds.coerceIn(4, 60)
+        if (subtitleHoldSeconds == next) return
+        subtitleHoldSeconds = next
+        prefs.subtitleHoldSeconds = next
+        if (isSessionActive()) RecognitionService.updateSubtitleHold(context)
     }
 
     /** 编辑完地址/Key/模型后，让运行中的会话立即用新配置重建引擎。 */

@@ -37,4 +37,8 @@ object ModelStore {
         modelsDir(context).listFiles()
             ?.filter { it.isFile && it.name.endsWith(".gguf", ignoreCase = true) && it.length() > 50_000_000L }
             ?.maxByOrNull { it.length() }
+
+    fun hasAllModels(context: Context): Boolean = ModelCatalog.isReady(context)
+
+    fun missingModels(context: Context): List<MissingModelFile> = ModelCatalog.missing(context)
 }
