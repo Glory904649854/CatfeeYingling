@@ -30,9 +30,9 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.engine.DemoRecognitionEngine
 import com.catfee.yingling.engine.ModelStore
+import com.catfee.yingling.engine.SherpaStreamingEngine
 import com.catfee.yingling.engine.RecognitionEngine
 import com.catfee.yingling.engine.RecognitionResult
-import com.catfee.yingling.engine.WhisperRecognitionEngine
 
 /**
  * 监听会话服务：
@@ -183,16 +183,17 @@ class RecognitionService : Service() {
 
     private fun buildEngine(): RecognitionEngine {
         val engine = if (prefs.targetLang == "en") {
-            val model = ModelStore.findModel(this)
-            if (model != null) {
-                WhisperRecognitionEngine(
-                    modelPath = model.absolutePath,
-                    translateToEnglish = true,
-                    sourceLanguage = if (prefs.sourceLang == "auto") null else prefs.sourceLang,
+            val sherpaModel = ModelStore.findSherpaModel(this)
+            val qwenModel = ModelStore.findQwenModel(this)
+
+            if (sherpaModel != null && qwenModel != null) {
+                SherpaStreamingEngine(
+                    model = sherpaModel,
+                    qwenModelPath = qwenModel.absolutePath,
                 )
             } else {
                 AppState.lastError.value =
-                    "未找到 Whisper 模型：请先把 ggml-small-q5_1.bin 放入应用 models 目录"
+                    "未找到流式模型：请放入 models/sherpa-zh-en 与 Qwen gguf"
                 DemoRecognitionEngine(prefs.sourceLang)
             }
         } else {
@@ -203,10 +204,15 @@ class RecognitionService : Service() {
     }
 
     private fun publishResult(result: RecognitionResult) {
-        AppState.sourceText.value = result.sourceText
-        AppState.translatedText.value = result.translatedText
+        // partial 只更新中文；翻译结果为空时保留上一条英文，避免字幕闪回“等待语音”
+        if (result.sourceText.isNotBlank()) {
+            AppState.sourceText.value = result.sourceText
+        }
+        if (result.translatedText.isNotBlank()) {
+            AppState.translatedText.value = result.translatedText
+        }
         main.post {
-            overlay?.setText(result.sourceText, result.translatedText)
+            overlay?.setText(AppState.sourceText.value, AppState.translatedText.value)
         }
     }
 

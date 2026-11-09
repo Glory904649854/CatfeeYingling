@@ -57,6 +57,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // Vosk 通过 JNA 加载 so，需要传统打包方式
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -81,6 +85,9 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material3)
+
+    // 流式中文识别：sherpa-onnx（Apache-2.0），AAR 已放在 app/libs
+    implementation(files("libs/sherpa-onnx.aar"))
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

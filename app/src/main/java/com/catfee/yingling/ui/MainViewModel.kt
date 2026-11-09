@@ -35,7 +35,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var targetLang by mutableStateOf(prefs.targetLang)
         private set
-    var whisperReady by mutableStateOf(false)
+    var fastReady by mutableStateOf(false)
         private set
 
     val status = AppState.status
@@ -55,7 +55,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             loading = false
         }
         viewModelScope.launch {
-            whisperReady = withContext(Dispatchers.IO) { ModelStore.findModel(context) != null }
+            fastReady = withContext(Dispatchers.IO) {
+                ModelStore.findSherpaModel(context) != null && ModelStore.findQwenModel(context) != null
+            }
         }
     }
 

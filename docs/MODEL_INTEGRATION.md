@@ -1,186 +1,137 @@
-# 模型接入指南
+# 模型接入与调优
 
-当前版本只有一个 `DemoRecognitionEngine`。真实模型接入只需实现 `RecognitionEngine`：
+当前实现：
 
-```kotlin
-interface RecognitionEngine {
-    val name: String
-    var onResult: ((RecognitionResult) -> Unit)?
-    fun start()
-    fun onAudio(pcm16k: ShortArray, level: Float)   // 16kHz / mono / 16bit
-    fun pause()
-    fun resume()
-    fun stop()
-}
+```
+sherpa-onnx Streaming Zipformer（中英双语）
+  → 端点检测 / 4 秒强制断句
+  → Qwen2.5-0.5B-Instruct（llama.cpp）
 ```
 
-然后把 `RecognitionService.buildEngine()` 的返回值换掉即可。音频层已经把 48kHz 立体声转成 **16kHz 单声道 PCM**，无需再处理采样率。
+相关代码：
+
+- `engine/SherpaStreamingEngine.kt`：ASR partial、断句、翻译调度
+- `engine/QwenBridge.kt` + `cpp/llama_jni.cpp`：llama.cpp JNI
+- `engine/ModelStore.kt`：模型路径查找
+- `service/RecognitionService.kt`：按目标语言选择引擎
 
 ---
 
-## 1. 推荐架构
+## 1. sherpa-onnx 流式 ASR
 
-```
-AudioPlaybackCapture (48k stereo)
-  → 16k mono (已实现)
-  → Silero VAD 断句
-  → Whisper small / SenseVoice（ASR + LID）
-  → Qwen3-0.6B/1.7B（翻译成中文）
-  → RecognitionResult → 悬浮窗
-```
+### 1.1 AAR
 
-六语种（中/英/日/韩/法/俄）建议：
-
-- **ASR 用 Whisper 单模型**，自带语种识别，覆盖全部六种；
-- **翻译用 Qwen 单模型**，一个模型覆盖六种源语言，避免维护 5 个 OPUS-MT 语向；
-- VAD 用 Silero，语言无关。
-
----
-
-## 2. sherpa-onnx 接入（推荐）
-
-### 2.1 依赖
-
-在 `app/build.gradle.kts` 增加 AAR（以官方发布版本为准）：
-
-```kotlin
-dependencies {
-    implementation("com.k2-fsa.sherpa.onnx:sherpa-onnx-android:1.12.0") // 版本按 release 调整
-}
-```
-
-若 Maven 坐标不可用，从 [sherpa-onnx Releases](https://github.com/k2-fsa/sherpa-onnx/releases) 下载 `sherpa-onnx-*.aar`，放入 `app/libs/`，再：
+`app/libs/sherpa-onnx.aar`（v2.0.1，Apache-2.0）已入库，Gradle 以本地 AAR 引用：
 
 ```kotlin
 implementation(files("libs/sherpa-onnx.aar"))
 ```
 
-### 2.2 模型
+### 1.2 模型
 
-从 GitHub Releases 的 `asr-models` 标签下载（免费、无需账号）：
+目录结构：
 
-- `sherpa-onnx-whisper-small`（六语种，约 180MB q5）
-- `sherpa-onnx-silero-vad`（约 2MB）
-- 可选：中文标点模型（CT-Transformer）
+```
+models/sherpa-zh-en/
+  encoder-epoch-99-avg-1.onnx   # 330MB
+  decoder-epoch-99-avg-1.onnx   # 14MB
+  joiner-epoch-99-avg-1.onnx    # 13MB
+  tokens.txt
+```
 
-不要塞进 APK，放 `filesDir/models/`，首次启动下载或让用户手动导入。
+下载：<https://hf-mirror.com/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20>
 
-### 2.3 代码骨架
+### 1.3 关键 API 注意点
 
 ```kotlin
-class SherpaRecognitionEngine(
-    private val modelDir: File,
-) : RecognitionEngine {
+// 绝对路径加载模型时，AssetManager 必须为 null，否则原生层会 abort
+val ctor = OnlineRecognizer::class.java.getConstructor(
+    AssetManager::class.java,
+    OnlineRecognizerConfig::class.java,
+)
+val recognizer = ctor.newInstance(null, config) as OnlineRecognizer
 
-    override val name = "Whisper small"
-    override var onResult: ((RecognitionResult) -> Unit)? = null
-
-    private val vad by lazy { VadModelConfig(...) }
-    private val recognizer by lazy { OfflineRecognizer(...) }
-    private var buffer = ShortArray(0)
-
-    override fun onAudio(pcm16k: ShortArray, level: Float) {
-        // 1) VAD 判断语音/静音
-        // 2) 累积到 2~8 秒的语音段
-        // 3) 静音超过 500ms 或段长超限 → recognizer.decode(segment)
-        // 4) 得到 sourceText + lang，再调用翻译引擎
-        // 5) onResult(RecognitionResult(source, translated, lang))
-    }
-}
+// 第二个参数是采样率，不是样本数！
+stream.acceptWaveform(samples, 16_000)
 ```
 
-要点：
+### 1.4 断句策略
 
-- Whisper 是非流式模型，必须靠 VAD 切段；单段建议 2~8 秒，太短准确率明显下降。
-- 语种识别用 Whisper 自带 LID，**连续两段一致再锁定**，避免短句抖动。
-- 静音段一定要跳过，否则 Whisper 容易幻觉出「谢谢观看」。
-- 中文输出可能是繁体，接 `OpenCC` 转简体后再翻译。
+- 正常端点：`recognizer.isEndpoint(stream)`
+- 课程/讲座长时间不停顿：`MAX_SEGMENT_MS = 4_000` 强制断句
+- partial 每 250ms 更新一次悬浮窗
 
----
-
-## 3. whisper.cpp 接入（备选）
-
-- 仓库：<https://github.com/ggml-org/whisper.cpp>（MIT）
-- Android 示例：`examples/whisper.android`
-- 模型：`ggml-small-q5_1.bin`（约 190MB）
-- 优点：依赖少、JNI 简单；缺点：VAD、标点、端测工程化要自己补。
+调大 `MAX_SEGMENT_MS`：译文更长、更连贯，但延迟增加；调小：字幕更频繁，但句子更碎。
 
 ---
 
-## 4. Qwen 翻译接入
+## 2. Qwen 翻译
 
-### 4.1 运行时
+### 2.1 模型
 
-- llama.cpp（MIT）Android 交叉编译；或
-- 阿里 MNN（Apache-2.0）的 LLM Android demo。
+`Qwen2.5-0.5B-Instruct-GGUF`，Q4_K_M，约 491MB：
 
-模型：`Qwen3-0.6B-GGUF`（约 400MB Q4）或 `Qwen2.5-1.5B-Instruct-GGUF`（约 1GB Q4）。
+<https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct-GGUF>
 
-### 4.2 Prompt（字幕场景）
+### 2.2 推理参数
 
-```text
-你是实时字幕翻译引擎。把 <src> 翻译成简体中文，口语化、简短，只输出译文。
-不要解释，不要加引号，不要输出原文。
-如果 <src> 已经是中文，直接原样返回。
-最近上下文（仅供参考，不要翻译）：
-上一句：{prev1}
-上上句：{prev2}
-<src>{text}</src>
+`cpp/llama_jni.cpp`：
+
+- `n_ctx = 512`、`n_batch = 256`
+- `n_threads = 6`（设备 8 核：2 大 + 6 小）
+- 贪心采样，最多 64 token
+- 每次翻译前清空 KV cache，保证不同句子互不影响
+- 编译启用 `-O3` 与 `-march=armv8.2-a+dotprod+fp16`
+
+### 2.3 Prompt
+
+```
+<|im_start|>system
+Translate the Chinese subtitle into concise English. Output only the translation.<|im_end|>
+<|im_start|>user
+{中文}<|im_end|>
+<|im_start|>assistant
 ```
 
-### 4.3 注意事项
+0.5B 仍可能输出 “Sure, here is the translation:” 或引号，Kotlin 侧 `cleanTranslation()` 会清理。
 
-- **Qwen3 默认可能输出思考过程**：prompt 里加 `/no_think`，或使用 non-thinking 模式，否则延迟不可接受。
-- 每次只翻译一句，`max_tokens` 控制在 64~96，避免超长输出。
-- 保留最近 2 句上下文，能显著改善代词与术语一致性。
-- 日/韩→中的离线小模型质量有限，若追求质量，只能上更大模型或云端。
+### 2.4 性能实测
 
----
-
-## 5. 语言识别与路由
-
-- Whisper 每个语音段返回 `lang`，用它做 LID。
-- 策略：连续 2 段相同才锁定；连续 3 段不同才切换。
-- UI 已提供「手动锁定语种」，影视剧/综艺建议手动锁定。
-- 混合语种不必特殊处理：逐段识别，按段语言路由翻译即可。
-
----
-
-## 6. 性能预算（旗舰 / 中端机量级）
-
-| 环节 | 参考值 |
+| 中文长度 | 耗时 |
 |---|---|
-| 采集 + 重采样 | < 5% CPU |
-| Whisper small q5（Redmi Note 9 实测） | 4.8s 音频 → 12.4s 推理 |
-| Whisper base q5（Redmi Note 9 实测） | 8.9s 音频 → 12.2s 推理 |
-| Qwen3-0.6B Q4 | 30~60 tok/s（旗舰）/ 15~30 tok/s（中端） |
-| OPUS-MT / M2M 备选 | 单句 0.05~1.5s |
-| 端到端字幕延迟 | 中端机 Whisper 约 12~15s；流式 ASR 可到 2~3s |
+| 13 字 | 1.5s |
+| 20~24 字 | 1.3~2.4s |
+| 28~33 字 | 2.3~4.1s |
+| 37 字 | 2.4~4.7s |
 
-> 关键：native 必须开优化。AGP debug 变体默认 `-O0`，whisper/ggml 会慢 10 倍以上；
-> 本项目在 `app/src/main/cpp/CMakeLists.txt` 强制 debug 也使用 `-O3`。
+想更快：
+1. 缩短 `MAX_SEGMENT_MS` 到 3 秒（句子更短，输出更少）；
+2. 换更小的 Q4_0 量化；
+3. 换 `Qwen2.5-0.5B` 以外的更小模型（质量下降明显）；
+4. 云端翻译（最快、质量最好，但需要网络/账号）。
 
-省电建议：
-
-- 只在 VAD 判定有语音时跑 ASR；
-- 16kHz 单声道，不要保留 48kHz 缓冲；
-- 采集线程与推理线程分离，推理用 2~4 个大核；
-- 悬浮窗隐藏时仍然可以只跑识别，但可下调刷新率。
+想更准：
+1. 换 `Qwen2.5-1.5B-Instruct`（约 1GB，速度约慢 2~3 倍）；
+2. 在 prompt 中加入领域术语表；
+3. 保留上一句作为上下文（会增加 token 与延迟）。
 
 ---
 
-## 7. 许可清单
+## 3. 语言方向
 
-| 组件 | License | 备注 |
-|---|---|---|
-| Whisper 代码与权重 | MIT | 可商用 |
-| whisper.cpp | MIT | 可商用 |
-| sherpa-onnx | Apache-2.0 | 可商用 |
-| Silero VAD | MIT | 可商用 |
-| Qwen3 | Apache-2.0 | 可商用 |
-| llama.cpp / MNN | MIT / Apache-2.0 | 可商用 |
-| OpenCC | Apache-2.0 | 可商用 |
-| OPUS-MT | CC-BY-4.0 | 需署名 |
-| M2M-100 | MIT | 可商用 |
-| NLLB-200 | CC-BY-NC-4.0 | **非商用** |
-| SenseVoice | MIT（以模型卡为准） | 仅中英日韩粤 |
+当前只支持目标 = 英语。源语言建议在 UI 锁定为中文；`sourceLanguage` 传给 Qwen 仅用于提示，不影响模型本身。
+
+要支持其他目标语言，需要换翻译模型/提示词：
+- 中 → 日/韩/法/俄：Qwen 提示词可改，但 0.5B 质量有限；
+- 或接云端翻译 API（DeepL/Google/LLM）。
+
+---
+
+## 4. 许可
+
+| 组件 | License |
+|---|---|
+| sherpa-onnx | Apache-2.0 |
+| llama.cpp | MIT |
+| Qwen2.5 | Apache-2.0 |
+| 本仓库代码 | 未声明（自行补充） |

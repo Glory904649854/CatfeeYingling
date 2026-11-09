@@ -186,7 +186,11 @@ fun HomeScreen(
             translatedText = translatedText,
             levelFlow = vm.level,
             overlayVisible = overlayVisible,
-            engineLabel = if (engineName.contains("Whisper")) "WHISPER" else "DEMO",
+            engineLabel = when {
+                engineName.contains("Qwen") -> "FAST"
+                engineName.contains("Whisper") -> "WHISPER"
+                else -> "DEMO"
+            },
             primaryText = primaryText,
             onPrimary = onPrimary,
             onStop = { RecognitionService.stop(context) },
@@ -198,7 +202,7 @@ fun HomeScreen(
         DirectionCard(
             sourceLang = vm.sourceLang,
             targetLang = vm.targetLang,
-            whisperReady = vm.whisperReady,
+            fastReady = vm.fastReady,
             onSelect = vm::selectSourceLang,
             onSelectTarget = vm::selectTargetLang,
         )
@@ -367,7 +371,7 @@ private fun LiveCard(
 private fun DirectionCard(
     sourceLang: String,
     targetLang: String,
-    whisperReady: Boolean,
+    fastReady: Boolean,
     onSelect: (String) -> Unit,
     onSelectTarget: (String) -> Unit,
 ) {
@@ -411,16 +415,20 @@ private fun DirectionCard(
             }
             Spacer(Modifier.weight(1f))
             Text(
-                text = if (targetLang == "en") "Whisper 直译" else "本地演示",
+                text = when {
+                    targetLang != "en" -> "本地演示"
+                    fastReady -> "Sherpa + Qwen 流式"
+                    else -> "模型未就绪"
+                },
                 color = TextTertiary,
                 fontSize = 9.5f.sp,
             )
         }
 
-        if (targetLang == "en" && !whisperReady) {
+        if (targetLang == "en" && !fastReady) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "未检测到 Whisper 模型，启动后会回退到演示引擎",
+                text = "未检测到流式模型（models/sherpa-zh-en + Qwen gguf），启动后会回退到演示引擎",
                 color = Warning,
                 fontSize = 10f.sp,
                 lineHeight = 15.sp,

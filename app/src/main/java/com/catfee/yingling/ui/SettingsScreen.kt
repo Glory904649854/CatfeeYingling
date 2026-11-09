@@ -88,27 +88,27 @@ fun SettingsScreen(vm: MainViewModel) {
             EngineRow(
                 title = "Demo 引擎（内置）",
                 subtitle = "按音量模拟断句，用于跑通 UI 与采集链路",
-                selected = !(vm.targetLang == "en" && vm.whisperReady),
+                selected = !(vm.targetLang == "en" && vm.fastReady),
                 planned = false,
                 onClick = { vm.selectTargetLang("zh") },
             )
             HairLine()
             EngineRow(
-                title = "Whisper small（中 → 英）",
-                subtitle = if (vm.whisperReady) {
-                    "模型已就绪 · whisper.cpp translate"
+                title = "Sherpa + Qwen（流式中 → 英）",
+                subtitle = if (vm.fastReady) {
+                    "流式识别 + 逐句翻译 · 约 2~4 秒"
                 } else {
-                    "未找到模型：放入 models/ggml-small-q5_1.bin"
+                    "未找到 models/sherpa-zh-en 或 Qwen gguf"
                 },
-                selected = vm.targetLang == "en" && vm.whisperReady,
+                selected = vm.targetLang == "en" && vm.fastReady,
                 planned = false,
                 onClick = {
-                    if (vm.whisperReady) {
+                    if (vm.fastReady) {
                         vm.selectTargetLang("en")
                     } else {
                         Toast.makeText(
                             context,
-                            "请先把 ggml-small-q5_1.bin 放入应用 models 目录",
+                            "请先把 sherpa-zh-en 目录与 Qwen gguf 放入应用 models 目录",
                             Toast.LENGTH_LONG,
                         ).show()
                     }

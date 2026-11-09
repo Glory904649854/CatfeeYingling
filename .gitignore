@@ -11,5 +11,5 @@
 app/build/
 *.log
 
-# 第三方源码由 scripts/fetch-whisper.ps1 拉取，不入库
-app/src/main/cpp/whisper.cpp/
+# 第三方源码由 scripts/fetch-llama.ps1 拉取，不入库
+app/src/main/cpp/llama.cpp/
