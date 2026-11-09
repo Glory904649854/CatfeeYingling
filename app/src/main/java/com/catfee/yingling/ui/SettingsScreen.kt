@@ -289,7 +289,7 @@ fun SettingsScreen(vm: MainViewModel) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "自定义供应商会自动关闭思考（reasoning_effort=none）；DeepSeek 官方 chat/flash 本身不思考。",
+                text = "自定义供应商会自动关闭思考（reasoning_effort=none）；DeepSeek 官方 deepseek-chat 本身不思考。",
                 color = TextTertiary,
                 fontSize = 10.sp,
                 lineHeight = 15.sp,

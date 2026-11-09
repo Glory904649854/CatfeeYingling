@@ -80,7 +80,7 @@ gradlew.bat assembleDebug
 - 开关关闭：完全保持原来的本地 Qwen 行为，不发起任何网络请求。
 - 开关开启：识别文本优先发往云端翻译；请求失败或返回空时自动回退本地 Qwen。
 - 只上传 ASR 识别出的文本，不上传音频、不截屏。
-- 自定义供应商（非 `api.deepseek.com`）会自动发送 `reasoning_effort: none` 关闭思考，无需手动配置；DeepSeek 官方 `deepseek-chat`/`deepseek-flash` 本身不思考。
+- 自定义供应商（非 `api.deepseek.com`）会自动发送 `reasoning_effort: none` 关闭思考，无需手动配置；DeepSeek 官方 `deepseek-chat` 本身不思考。
 
 > 自定义 Base URL 若使用 `http://`，应用已允许明文流量（`usesCleartextTraffic`）；
 > 公网服务建议使用 HTTPS。
