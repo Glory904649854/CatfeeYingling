@@ -486,7 +486,7 @@ class OverlayController(
     private companion object {
         const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
         const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
-        const val HOLD_MS = 12_000L
+        const val HOLD_MS = 6_000L
         const val FADE_MS = 650L
     }
 }

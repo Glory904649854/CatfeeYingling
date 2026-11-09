@@ -34,6 +34,31 @@ class Prefs(context: Context) {
             sp.edit().putString(KEY_TARGET_LANG, value).apply()
         }
 
+    var cloudEnabled: Boolean
+        get() = sp.getBoolean(KEY_CLOUD_ENABLED, false)
+        set(value) {
+            sp.edit().putBoolean(KEY_CLOUD_ENABLED, value).apply()
+        }
+
+    var cloudBaseUrl: String
+        get() = sp.getString(KEY_CLOUD_BASE_URL, "https://api.deepseek.com/v1")
+            ?: "https://api.deepseek.com/v1"
+        set(value) {
+            sp.edit().putString(KEY_CLOUD_BASE_URL, value).apply()
+        }
+
+    var cloudApiKey: String
+        get() = sp.getString(KEY_CLOUD_API_KEY, "") ?: ""
+        set(value) {
+            sp.edit().putString(KEY_CLOUD_API_KEY, value).apply()
+        }
+
+    var cloudModel: String
+        get() = sp.getString(KEY_CLOUD_MODEL, "deepseek-chat") ?: "deepseek-chat"
+        set(value) {
+            sp.edit().putString(KEY_CLOUD_MODEL, value).apply()
+        }
+
     companion object {
         const val MODE_APPS = "apps"
         const val MODE_ALL = "all"
@@ -42,5 +67,9 @@ class Prefs(context: Context) {
         private const val KEY_MODE = "listen_mode"
         private const val KEY_LANG = "source_lang"
         private const val KEY_TARGET_LANG = "target_lang"
+        private const val KEY_CLOUD_ENABLED = "cloud_enabled"
+        private const val KEY_CLOUD_BASE_URL = "cloud_base_url"
+        private const val KEY_CLOUD_API_KEY = "cloud_api_key"
+        private const val KEY_CLOUD_MODEL = "cloud_model"
     }
 }

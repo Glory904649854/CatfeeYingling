@@ -20,11 +20,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class SherpaStreamingEngine(
     private val model: SherpaModel,
-    private val qwenModelPath: String,
+    private val translator: Translator,
     private val targetLanguage: String,
 ) : RecognitionEngine {
 
-    override val name: String = "Sherpa + Qwen"
+    override val name: String = if (translator.isCloud) "Sherpa + 云端 LLM" else "Sherpa + Qwen"
     override var onResult: ((RecognitionResult) -> Unit)? = null
 
     private val asrWorker = Executors.newSingleThreadExecutor { Thread(it, "yingling-sherpa") }
@@ -33,7 +33,6 @@ class SherpaStreamingEngine(
 
     private var recognizer: OnlineRecognizer? = null
     private var stream: OnlineStream? = null
-    private var qwenHandle = 0L
 
     @Volatile
     private var ready = false
@@ -80,17 +79,11 @@ class SherpaStreamingEngine(
                 return@execute
             }
 
-            qwenHandle = try {
-                QwenBridge.nativeInit(qwenModelPath)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Qwen init failed", t)
-                0L
-            }
-
-            ready = qwenHandle != 0L && stream != null
-            Log.d(TAG, "ready=$ready qwen=$qwenHandle")
+            translator.start()
+            ready = translator.isReady && stream != null
+            Log.d(TAG, "ready=$ready cloud=${translator.isCloud}")
             if (!ready) {
-                onResult?.invoke(RecognitionResult("", "Qwen 模型加载失败", "zh"))
+                onResult?.invoke(RecognitionResult("", "翻译模型加载失败", "zh"))
             }
         }
     }
@@ -153,13 +146,11 @@ class SherpaStreamingEngine(
         try {
             val begin = SystemClock.elapsedRealtime()
             val translated = try {
-                QwenBridge.nativeTranslate(qwenHandle, text, targetLanguage)
+                translator.translate(text, targetLanguage)
             } catch (t: Throwable) {
                 Log.e(TAG, "translate failed", t)
                 ""
-            }.let { cleanTranslation(it, targetLanguage)
-
-            }
+            }.let { cleanTranslation(it, targetLanguage) }
             val elapsed = SystemClock.elapsedRealtime() - begin
             Log.d(TAG, "translate ${text.length} chars -> ${elapsed}ms: $translated")
             if (translated.isNotBlank()) {
@@ -231,10 +222,7 @@ class SherpaStreamingEngine(
             recognizer = null
         }
         mtWorker.execute {
-            if (qwenHandle != 0L) {
-                runCatching { QwenBridge.nativeRelease(qwenHandle) }
-                qwenHandle = 0L
-            }
+            translator.close()
         }
         asrWorker.shutdown()
         mtWorker.shutdown()

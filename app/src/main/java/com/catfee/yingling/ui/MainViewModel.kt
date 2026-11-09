@@ -35,6 +35,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var targetLang by mutableStateOf(prefs.targetLang)
         private set
+    var cloudEnabled by mutableStateOf(prefs.cloudEnabled)
+        private set
+    var cloudBaseUrl by mutableStateOf(prefs.cloudBaseUrl)
+        private set
+    var cloudApiKey by mutableStateOf(prefs.cloudApiKey)
+        private set
+    var cloudModel by mutableStateOf(prefs.cloudModel)
+        private set
     var fastReady by mutableStateOf(false)
         private set
 
@@ -62,9 +70,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun refreshReady() {
         val source = sourceLang
         val target = targetLang
+        val cloud = cloudEnabled && cloudApiKey.isNotBlank()
         viewModelScope.launch {
             fastReady = withContext(Dispatchers.IO) {
-                if (ModelStore.findQwenModel(context) == null) return@withContext false
+                val hasTranslator = cloud || ModelStore.findQwenModel(context) != null
+                if (!hasTranslator) return@withContext false
                 if (target == "en") {
                     ModelStore.findSherpaModel(context) != null
                 } else {
@@ -128,6 +138,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun isSessionActive(): Boolean =
         status.value == SessionStatus.RUNNING || status.value == SessionStatus.PAUSED
+
+    fun selectCloudEnabled(value: Boolean) {
+        if (cloudEnabled == value) return
+        cloudEnabled = value
+        prefs.cloudEnabled = value
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
+
+    fun updateCloudBaseUrl(value: String) {
+        cloudBaseUrl = value
+        prefs.cloudBaseUrl = value
+    }
+
+    fun updateCloudApiKey(value: String) {
+        cloudApiKey = value
+        prefs.cloudApiKey = value
+    }
+
+    fun updateCloudModel(value: String) {
+        cloudModel = value
+        prefs.cloudModel = value
+    }
+
+    /** 编辑完地址/Key/模型后，让运行中的会话立即用新配置重建引擎。 */
+    fun applyCloudConfig() {
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
 
     fun clearError() {
         AppState.clearError()

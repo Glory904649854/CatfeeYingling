@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -31,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -94,11 +97,11 @@ fun SettingsScreen(vm: MainViewModel) {
             )
             HairLine()
             EngineRow(
-                title = "多语种流式（Sherpa / SenseVoice + Qwen）",
+                title = "多语种流式（Sherpa / SenseVoice）",
                 subtitle = if (vm.fastReady) {
-                    "中/英/日/韩 → 中文，中 → 英 · 约 1.5~3 秒"
+                    "中/英/日/韩 → 中文，中 → 英 · 本地或云端翻译"
                 } else {
-                    "未找到对应的 ASR 模型或 Qwen 模型"
+                    "未找到对应的 ASR 模型或翻译模型"
                 },
                 selected = vm.fastReady,
                 planned = false,
@@ -126,19 +129,92 @@ fun SettingsScreen(vm: MainViewModel) {
             SectionTitle("翻译引擎")
             Spacer(Modifier.height(4.dp))
             EngineRow(
-                title = "本地 Qwen3",
-                subtitle = "0.6B / 1.7B，六语种直译中文，可带上下文",
-                selected = false,
-                planned = true,
-                onClick = { planned() },
+                title = "本地 Qwen（默认）",
+                subtitle = if (vm.cloudEnabled) {
+                    "当前使用云端，本地模型作为失败兜底"
+                } else {
+                    "0.5B · 离线运行 · 每句约 1.5~3 秒"
+                },
+                selected = !vm.cloudEnabled,
+                planned = false,
+                onClick = { vm.selectCloudEnabled(false) },
             )
             HairLine()
-            EngineRow(
-                title = "云端翻译（可选）",
-                subtitle = "质量最好，但需要联网与账号，默认关闭",
-                selected = false,
-                planned = true,
-                onClick = { planned() },
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "云端 LLM（OpenAI 兼容）",
+                        color = if (vm.cloudEnabled) TextPrimary else TextSecondary,
+                        fontSize = 13.5f.sp,
+                        fontWeight = if (vm.cloudEnabled) FontWeight.Medium else FontWeight.Normal,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "开启后优先云端翻译，失败自动回退本地",
+                        color = TextTertiary,
+                        fontSize = 10.5f.sp,
+                    )
+                }
+                Switch(
+                    checked = vm.cloudEnabled,
+                    onCheckedChange = vm::selectCloudEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color(0xFF04120E),
+                        checkedTrackColor = Mint,
+                        uncheckedThumbColor = TextTertiary,
+                        uncheckedTrackColor = SurfaceHigh,
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            CloudField(
+                label = "Base URL",
+                value = vm.cloudBaseUrl,
+                onValueChange = vm::updateCloudBaseUrl,
+                placeholder = "https://api.deepseek.com/v1",
+            )
+            Spacer(Modifier.height(8.dp))
+            CloudField(
+                label = "API Key",
+                value = vm.cloudApiKey,
+                onValueChange = vm::updateCloudApiKey,
+                placeholder = "sk-...",
+                secret = true,
+            )
+            Spacer(Modifier.height(8.dp))
+            CloudField(
+                label = "模型",
+                value = vm.cloudModel,
+                onValueChange = vm::updateCloudModel,
+                placeholder = "deepseek-chat",
+            )
+            Spacer(Modifier.height(10.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(SurfaceHigh)
+                    .clickable {
+                        vm.applyCloudConfig()
+                        Toast.makeText(context, "云端配置已应用", Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "应用配置",
+                    color = Mint,
+                    fontSize = 12.5f.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Key 只保存在本机应用私有存储，不会写入仓库或日志。",
+                color = TextTertiary,
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
             )
         }
 
@@ -183,7 +259,14 @@ fun SettingsScreen(vm: MainViewModel) {
             InfoLine("音频来源", "AudioPlaybackCapture · 48kHz → 16kHz")
             InfoLine("前台服务", "microphone · Android 14+ 需应用可见时启动")
             InfoLine("字幕链路", "VAD → ASR → 翻译 → 悬浮字幕")
-            InfoLine("数据去向", "全部在本机处理，不发起云端请求")
+            InfoLine(
+                "数据去向",
+                if (vm.cloudEnabled) {
+                    "音频仍在本机识别；仅识别文本发往自定义云端翻译"
+                } else {
+                    "全部在本机处理，不发起云端请求"
+                },
+            )
         }
 
         Spacer(Modifier.height(14.dp))
@@ -214,6 +297,41 @@ fun SettingsScreen(vm: MainViewModel) {
 
         Spacer(Modifier.height(26.dp))
     }
+}
+
+@Composable
+private fun CloudField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    secret: Boolean = false,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, fontSize = 11.sp) },
+        placeholder = { Text(placeholder, color = TextTertiary, fontSize = 12.sp) },
+        singleLine = true,
+        visualTransformation = if (secret) {
+            PasswordVisualTransformation()
+        } else {
+            androidx.compose.ui.text.input.VisualTransformation.None
+        },
+        textStyle = MaterialTheme.typography.bodySmall,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Mint,
+            unfocusedBorderColor = BorderDark,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary,
+            cursorColor = Mint,
+            focusedLabelColor = Mint,
+            unfocusedLabelColor = TextTertiary,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

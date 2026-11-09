@@ -187,6 +187,7 @@ fun HomeScreen(
             levelFlow = vm.level,
             overlayVisible = overlayVisible,
             engineLabel = when {
+                engineName.contains("云端") -> "CLOUD"
                 engineName.contains("Qwen") -> "FAST"
                 engineName.contains("Whisper") -> "WHISPER"
                 else -> "DEMO"
@@ -203,6 +204,7 @@ fun HomeScreen(
             sourceLang = vm.sourceLang,
             targetLang = vm.targetLang,
             fastReady = vm.fastReady,
+            cloudEnabled = vm.cloudEnabled,
             onSelect = vm::selectSourceLang,
             onSelectTarget = vm::selectTargetLang,
         )
@@ -372,6 +374,7 @@ private fun DirectionCard(
     sourceLang: String,
     targetLang: String,
     fastReady: Boolean,
+    cloudEnabled: Boolean,
     onSelect: (String) -> Unit,
     onSelectTarget: (String) -> Unit,
 ) {
@@ -416,6 +419,10 @@ private fun DirectionCard(
             Spacer(Modifier.weight(1f))
             Text(
                 text = when {
+                    fastReady && cloudEnabled && targetLang == "zh" &&
+                        (sourceLang == "ja" || sourceLang == "ko" || sourceLang == "en") ->
+                        "SenseVoice + 云端"
+                    fastReady && cloudEnabled -> "Sherpa + 云端"
                     fastReady && targetLang == "zh" &&
                         (sourceLang == "ja" || sourceLang == "ko" || sourceLang == "en") ->
                         "SenseVoice + Qwen"
@@ -432,7 +439,7 @@ private fun DirectionCard(
         if (!fastReady && !(targetLang == "zh" && (sourceLang == "fr" || sourceLang == "ru"))) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "未检测到对应的 ASR 模型或 Qwen gguf，启动后会回退到演示引擎",
+                text = "未检测到对应的 ASR 模型或翻译模型，启动后会回退到演示引擎",
                 color = Warning,
                 fontSize = 10f.sp,
                 lineHeight = 15.sp,

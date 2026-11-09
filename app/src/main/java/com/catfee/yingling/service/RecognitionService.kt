@@ -29,12 +29,14 @@ import com.catfee.yingling.core.Languages
 import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.core.SubtitleLine
+import com.catfee.yingling.engine.CloudLlmConfig
 import com.catfee.yingling.engine.DemoRecognitionEngine
 import com.catfee.yingling.engine.ModelStore
 import com.catfee.yingling.engine.SenseVoiceEngine
 import com.catfee.yingling.engine.SherpaStreamingEngine
 import com.catfee.yingling.engine.RecognitionEngine
 import com.catfee.yingling.engine.RecognitionResult
+import com.catfee.yingling.engine.Translator
 
 /**
  * 监听会话服务：
@@ -187,15 +189,26 @@ class RecognitionService : Service() {
 
     private fun buildEngine(): RecognitionEngine {
         val qwen = ModelStore.findQwenModel(this)
-        val engine = if (qwen == null) {
-            AppState.lastError.value = "未找到 Qwen 翻译模型"
+        val cloud = if (prefs.cloudEnabled && prefs.cloudApiKey.isNotBlank()) {
+            CloudLlmConfig(
+                baseUrl = prefs.cloudBaseUrl,
+                apiKey = prefs.cloudApiKey,
+                model = prefs.cloudModel,
+            )
+        } else {
+            null
+        }
+        val translator = Translator(cloud, qwen?.absolutePath)
+
+        val engine = if (cloud == null && qwen == null) {
+            AppState.lastError.value = "未找到 Qwen 翻译模型，且未开启云端 LLM"
             DemoRecognitionEngine(prefs.sourceLang)
         } else {
             when {
                 prefs.targetLang == "en" -> {
                     val sherpa = ModelStore.findSherpaModel(this)
                     if (sherpa != null) {
-                        SherpaStreamingEngine(sherpa, qwen.absolutePath, "en")
+                        SherpaStreamingEngine(sherpa, translator, "en")
                     } else {
                         AppState.lastError.value = "未找到 sherpa-zh-en 模型"
                         DemoRecognitionEngine(prefs.sourceLang)
@@ -206,7 +219,7 @@ class RecognitionService : Service() {
                     prefs.sourceLang == "en" -> {
                     val sense = ModelStore.findSenseVoiceModel(this)
                     if (sense != null) {
-                        SenseVoiceEngine(sense, qwen.absolutePath, prefs.sourceLang, "zh")
+                        SenseVoiceEngine(sense, translator, prefs.sourceLang, "zh")
                     } else {
                         AppState.lastError.value = "未找到 SenseVoice 模型"
                         DemoRecognitionEngine(prefs.sourceLang)
@@ -221,7 +234,7 @@ class RecognitionService : Service() {
                 else -> {
                     val sherpa = ModelStore.findSherpaModel(this)
                     if (sherpa != null) {
-                        SherpaStreamingEngine(sherpa, qwen.absolutePath, "zh")
+                        SherpaStreamingEngine(sherpa, translator, "zh")
                     } else {
                         AppState.lastError.value = "未找到 sherpa-zh-en 模型"
                         DemoRecognitionEngine(prefs.sourceLang)
@@ -307,6 +320,7 @@ class RecognitionService : Service() {
 
         engine?.stop()
         engine = buildEngine().also { it.start() }
+        AppState.engineName.value = engine?.name ?: "Demo 引擎"
         if (paused) engine?.pause()
 
         if (!paused) {

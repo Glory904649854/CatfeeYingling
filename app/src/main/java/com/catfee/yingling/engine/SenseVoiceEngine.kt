@@ -19,12 +19,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class SenseVoiceEngine(
     private val model: SenseVoiceModel,
-    private val qwenModelPath: String,
+    private val translator: Translator,
     private val sourceLanguage: String,
     private val targetLanguage: String,
 ) : RecognitionEngine {
 
-    override val name: String = "SenseVoice + Qwen"
+    override val name: String = if (translator.isCloud) "SenseVoice + 云端 LLM" else "SenseVoice + Qwen"
     override var onResult: ((RecognitionResult) -> Unit)? = null
 
     private val asrWorker = Executors.newSingleThreadExecutor { Thread(it, "yingling-sensevoice") }
@@ -34,7 +34,6 @@ class SenseVoiceEngine(
     private val buffer = ShortBuffer()
 
     private var recognizer: OfflineRecognizer? = null
-    private var qwenHandle = 0L
 
     @Volatile
     private var ready = false
@@ -78,15 +77,9 @@ class SenseVoiceEngine(
                 return@execute
             }
 
-            qwenHandle = try {
-                QwenBridge.nativeInit(qwenModelPath)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Qwen init failed", t)
-                0L
-            }
-
-            ready = qwenHandle != 0L
-            Log.d(TAG, "ready=$ready qwen=$qwenHandle")
+            translator.start()
+            ready = translator.isReady
+            Log.d(TAG, "ready=$ready cloud=${translator.isCloud}")
         }
     }
 
@@ -160,7 +153,7 @@ class SenseVoiceEngine(
         try {
             val begin = SystemClock.elapsedRealtime()
             val translated = try {
-                QwenBridge.nativeTranslate(qwenHandle, text, targetLanguage)
+                translator.translate(text, targetLanguage)
             } catch (t: Throwable) {
                 Log.e(TAG, "translate failed", t)
                 ""
@@ -218,10 +211,7 @@ class SenseVoiceEngine(
             recognizer = null
         }
         mtWorker.execute {
-            if (qwenHandle != 0L) {
-                runCatching { QwenBridge.nativeRelease(qwenHandle) }
-                qwenHandle = 0L
-            }
+            translator.close()
         }
         asrWorker.shutdown()
         mtWorker.shutdown()
