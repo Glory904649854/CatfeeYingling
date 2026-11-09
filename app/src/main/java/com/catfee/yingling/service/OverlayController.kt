@@ -161,6 +161,7 @@ class OverlayController(
         if (status == SessionStatus.ERROR) {
             liveView?.text = "音频采集异常"
             liveView?.visibility = View.VISIBLE
+            updateBodyVisibility(force = true)
         }
     }
 
@@ -259,11 +260,11 @@ class OverlayController(
         val bodyView = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         container.addView(bodyView, LinearLayout.LayoutParams(MATCH, WRAP))
         body = bodyView
-        bodyView.visibility = if (collapsed) View.GONE else View.VISIBLE
+        bodyView.visibility = View.GONE
 
         collapse.setOnClickListener {
             collapsed = !collapsed
-            bodyView.visibility = if (collapsed) View.GONE else View.VISIBLE
+            updateBodyVisibility()
             collapse.text = if (collapsed) "▸" else "▾"
         }
 
@@ -277,9 +278,10 @@ class OverlayController(
         transcriptBox = box
 
         val placeholder = TextView(context).apply {
-            text = "等待语音…"
+            text = ""
             setTextColor(Colors.muted)
             textSize = 14f
+            visibility = View.GONE
         }
         box.addView(placeholder, LinearLayout.LayoutParams(MATCH, WRAP))
         liveView = placeholder
@@ -330,6 +332,7 @@ class OverlayController(
         val fade = Runnable { fadeOut(entry) }
         entry.postDelayed(fade, holdMs)
         entries.add(Entry(entry, fade, createdAt))
+        updateBodyVisibility()
     }
 
     private fun fadeOut(view: View) {
@@ -340,9 +343,10 @@ class OverlayController(
                 transcriptBox?.removeView(view)
                 entries.removeAll { it.view === view }
                 if (entries.isEmpty() && currentLive.isBlank()) {
-                    liveView?.text = "等待语音…"
-                    liveView?.visibility = View.VISIBLE
+                    liveView?.text = ""
+                    liveView?.visibility = View.GONE
                 }
+                updateBodyVisibility()
                 scrollToBottom(smooth = false)
             }
             .start()
@@ -362,12 +366,8 @@ class OverlayController(
         val box = transcriptBox ?: return
 
         if (live.isBlank()) {
-            if (entries.isEmpty()) {
-                view.text = "等待语音…"
-                view.visibility = View.VISIBLE
-            } else {
-                view.visibility = View.GONE
-            }
+            view.text = ""
+            view.visibility = View.GONE
         } else {
             view.text = live
             view.visibility = View.VISIBLE
@@ -378,7 +378,15 @@ class OverlayController(
             box.removeView(view)
         }
         box.addView(view, LinearLayout.LayoutParams(MATCH, WRAP))
+        updateBodyVisibility(force = live.isNotBlank())
         maybeScrollToBottom()
+    }
+
+    /** 没有字幕时整个内容区收起，只保留标题栏。 */
+    private fun updateBodyVisibility(force: Boolean = false) {
+        val bodyView = body ?: return
+        val hasContent = force || entries.isNotEmpty() || currentLive.isNotBlank()
+        bodyView.visibility = if (!collapsed && hasContent) View.VISIBLE else View.GONE
     }
 
     private fun scrollToBottom(smooth: Boolean) {
