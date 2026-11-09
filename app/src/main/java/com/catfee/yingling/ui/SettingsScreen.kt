@@ -22,14 +22,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +55,7 @@ import com.catfee.yingling.ui.components.SectionTitle
 import com.catfee.yingling.ui.components.TagChip
 import com.catfee.yingling.ui.theme.BorderDark
 import com.catfee.yingling.ui.theme.Cyan
+import com.catfee.yingling.ui.theme.Danger
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
@@ -62,6 +68,7 @@ fun SettingsScreen(vm: MainViewModel) {
     val status by vm.status.collectAsStateWithLifecycle()
     val overlayVisible by vm.overlayVisible.collectAsStateWithLifecycle()
     val active = status == SessionStatus.RUNNING || status == SessionStatus.PAUSED
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     fun planned() {
         Toast.makeText(
@@ -179,6 +186,33 @@ fun SettingsScreen(vm: MainViewModel) {
             }
 
             Spacer(Modifier.height(8.dp))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                vm.providers.forEach { provider ->
+                    TagChip(
+                        text = provider.name,
+                        selected = provider.id == vm.activeProviderId,
+                        onClick = { vm.selectProvider(provider.id) },
+                    )
+                }
+                TagChip(
+                    text = "+ 新增",
+                    selected = false,
+                    onClick = vm::addProvider,
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            CloudField(
+                label = "供应商名称",
+                value = vm.cloudName,
+                onValueChange = vm::updateCloudName,
+                placeholder = "DeepSeek 官方",
+            )
+            Spacer(Modifier.height(8.dp))
             CloudField(
                 label = "Base URL",
                 value = vm.cloudBaseUrl,
@@ -199,6 +233,13 @@ fun SettingsScreen(vm: MainViewModel) {
                 value = vm.cloudModel,
                 onValueChange = vm::updateCloudModel,
                 placeholder = "deepseek-chat",
+            )
+            Spacer(Modifier.height(8.dp))
+            CloudField(
+                label = "额外参数（JSON，可选）",
+                value = vm.cloudExtraJson,
+                onValueChange = vm::updateCloudExtraJson,
+                placeholder = "{\"enable_thinking\": false}",
             )
             Spacer(Modifier.height(10.dp))
             Box(
@@ -222,10 +263,53 @@ fun SettingsScreen(vm: MainViewModel) {
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Key 只保存在本机应用私有存储，不会写入仓库或日志。",
+                text = "每个供应商独立保存 Key，切换不会覆盖其他供应商；Key 只保存在本机应用私有存储。",
                 color = TextTertiary,
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "DeepSeek chat 本身不思考；Qwen3 等可填 {\"enable_thinking\": false} 关闭思考。不同供应商参数不同，留空即可。",
+                color = TextTertiary,
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
+            )
+            if (vm.providers.size > 1) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "删除当前供应商",
+                    color = Danger,
+                    fontSize = 10.5f.sp,
+                    modifier = Modifier.clickable { showDeleteDialog = true },
+                )
+            }
+        }
+
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("删除供应商") },
+                text = {
+                    Text(
+                        "只会删除「${vm.cloudName.ifBlank { "当前供应商" }}」的配置，其他供应商的 Key 不受影响。",
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            vm.deleteActiveProvider()
+                            showDeleteDialog = false
+                        },
+                    ) {
+                        Text("删除", color = Danger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("取消")
+                    }
+                },
             )
         }
 

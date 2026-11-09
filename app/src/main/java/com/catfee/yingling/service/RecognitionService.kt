@@ -192,11 +192,13 @@ class RecognitionService : Service() {
 
     private fun buildEngine(): RecognitionEngine {
         val qwen = ModelStore.findQwenModel(this)
-        val cloud = if (prefs.cloudEnabled && prefs.cloudApiKey.isNotBlank()) {
+        val provider = prefs.activeProvider()
+        val cloud = if (prefs.cloudEnabled && provider.apiKey.isNotBlank()) {
             CloudLlmConfig(
-                baseUrl = prefs.cloudBaseUrl,
-                apiKey = prefs.cloudApiKey,
-                model = prefs.cloudModel,
+                baseUrl = provider.baseUrl,
+                apiKey = provider.apiKey,
+                model = provider.model,
+                extraJson = provider.extraJson,
             )
         } else {
             null

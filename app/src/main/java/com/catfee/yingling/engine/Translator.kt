@@ -11,6 +11,7 @@ data class CloudLlmConfig(
     val baseUrl: String,
     val apiKey: String,
     val model: String,
+    val extraJson: String = "",
 )
 
 /**
@@ -83,6 +84,8 @@ class Translator(
 /** OpenAI 兼容的 chat/completions 调用。 */
 object CloudClient {
 
+    private val CORE_KEYS = setOf("model", "messages", "stream", "temperature", "max_tokens")
+
     fun translate(config: CloudLlmConfig, text: String, targetLanguage: String): String {
         val base = config.baseUrl.trim().trimEnd('/')
         if (base.isBlank() || config.apiKey.isBlank() || config.model.isBlank()) {
@@ -106,6 +109,17 @@ object CloudClient {
         }
 
         val payload = JSONObject().apply {
+            // 供应商自定义参数（如 enable_thinking / reasoning_effort）先放，
+            // 下面再用核心字段覆盖，避免把 model/messages 写坏。
+            if (config.extraJson.isNotBlank()) {
+                runCatching { JSONObject(config.extraJson) }.getOrNull()?.let { extra ->
+                    val keys = extra.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        if (key !in CORE_KEYS) put(key, extra.get(key))
+                    }
+                }
+            }
             put("model", config.model)
             put("temperature", 0)
             put("max_tokens", 256)

@@ -1,6 +1,8 @@
 package com.catfee.yingling.core
 
 import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** 轻量偏好存储：监听范围、源语言、悬浮窗开关。 */
 class Prefs(context: Context) {
@@ -66,6 +68,77 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_SUBTITLE_HOLD, value.coerceIn(4, 60)).apply()
         }
 
+    var activeProviderId: String
+        get() = sp.getString(KEY_ACTIVE_PROVIDER, "") ?: ""
+        set(value) {
+            sp.edit().putString(KEY_ACTIVE_PROVIDER, value).apply()
+        }
+
+    /**
+     * 多供应商配置。旧版本的 cloud_base_url / cloud_api_key / cloud_model
+     * 会在第一次读取时迁移成「DeepSeek 官方」供应商，原 Key 不丢。
+     */
+    fun cloudProviders(): List<CloudProvider> {
+        val raw = sp.getString(KEY_CLOUD_PROVIDERS, null)
+        if (!raw.isNullOrBlank()) {
+            val parsed = runCatching {
+                val array = JSONArray(raw)
+                buildList {
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val id = item.optString("id").ifBlank { "provider-$i" }
+                        add(
+                            CloudProvider(
+                                id = id,
+                                name = item.optString("name").ifBlank { "供应商 ${i + 1}" },
+                                baseUrl = item.optString("baseUrl"),
+                                apiKey = item.optString("apiKey"),
+                                model = item.optString("model"),
+                                extraJson = item.optString("extraJson"),
+                            ),
+                        )
+                    }
+                }
+            }.getOrNull()
+            if (!parsed.isNullOrEmpty()) return parsed
+        }
+
+        return listOf(
+            CloudProvider(
+                id = "deepseek",
+                name = "DeepSeek 官方",
+                baseUrl = cloudBaseUrl,
+                apiKey = cloudApiKey,
+                model = cloudModel,
+            ),
+        )
+    }
+
+    fun saveCloudProviders(providers: List<CloudProvider>) {
+        val array = JSONArray()
+        providers.forEach { provider ->
+            array.put(
+                JSONObject().apply {
+                    put("id", provider.id)
+                    put("name", provider.name)
+                    put("baseUrl", provider.baseUrl)
+                    put("apiKey", provider.apiKey)
+                    put("model", provider.model)
+                    put("extraJson", provider.extraJson)
+                },
+            )
+        }
+        sp.edit().putString(KEY_CLOUD_PROVIDERS, array.toString()).apply()
+        if (providers.isNotEmpty() && providers.none { it.id == activeProviderId }) {
+            activeProviderId = providers.first().id
+        }
+    }
+
+    fun activeProvider(): CloudProvider {
+        val providers = cloudProviders()
+        return providers.firstOrNull { it.id == activeProviderId } ?: providers.first()
+    }
+
     companion object {
         const val MODE_APPS = "apps"
         const val MODE_ALL = "all"
@@ -80,6 +153,8 @@ class Prefs(context: Context) {
         private const val KEY_CLOUD_BASE_URL = "cloud_base_url"
         private const val KEY_CLOUD_API_KEY = "cloud_api_key"
         private const val KEY_CLOUD_MODEL = "cloud_model"
+        private const val KEY_CLOUD_PROVIDERS = "cloud_providers"
+        private const val KEY_ACTIVE_PROVIDER = "cloud_active_provider"
         private const val KEY_SUBTITLE_HOLD = "subtitle_hold_seconds"
     }
 }

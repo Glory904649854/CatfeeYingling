@@ -73,10 +73,15 @@ gradlew.bat assembleDebug
 设置 → 翻译引擎 → 云端 LLM：
 
 - Base URL 默认 `https://api.deepseek.com/v1`，可填任意 OpenAI 兼容服务。
+- **支持多供应商**：每个供应商独立保存名称、Base URL、API Key、模型和额外参数；切换不会覆盖其他供应商的 Key。
 - 模型默认 `deepseek-chat`；API Key 只保存在本机应用私有存储，不入库、不写日志。
 - 开关关闭：完全保持原来的本地 Qwen 行为，不发起任何网络请求。
 - 开关开启：识别文本优先发往云端翻译；请求失败或返回空时自动回退本地 Qwen。
 - 只上传 ASR 识别出的文本，不上传音频、不截屏。
+- 额外参数（JSON）会合并进请求体，可用于关闭思考：
+  - Qwen3 / SiliconFlow：`{"enable_thinking": false}`
+  - OpenAI reasoning 模型：`{"reasoning_effort": "minimal"}`
+  - DeepSeek `deepseek-chat` 本身不思考，留空即可。
 
 > 自定义 Base URL 若使用 `http://`，应用已允许明文流量（`usesCleartextTraffic`）；
 > 公网服务建议使用 HTTPS。

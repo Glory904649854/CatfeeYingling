@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.catfee.yingling.core.AppState
+import com.catfee.yingling.core.CloudProvider
 import com.catfee.yingling.core.Languages
 import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
@@ -21,6 +22,7 @@ import com.catfee.yingling.util.NetworkStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -41,11 +43,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var cloudEnabled by mutableStateOf(prefs.cloudEnabled)
         private set
-    var cloudBaseUrl by mutableStateOf(prefs.cloudBaseUrl)
+    var providers by mutableStateOf<List<CloudProvider>>(emptyList())
         private set
-    var cloudApiKey by mutableStateOf(prefs.cloudApiKey)
+    var activeProviderId by mutableStateOf("")
         private set
-    var cloudModel by mutableStateOf(prefs.cloudModel)
+    var cloudName by mutableStateOf("")
+        private set
+    var cloudBaseUrl by mutableStateOf("")
+        private set
+    var cloudApiKey by mutableStateOf("")
+        private set
+    var cloudModel by mutableStateOf("")
+        private set
+    var cloudExtraJson by mutableStateOf("")
         private set
     var subtitleHoldSeconds by mutableStateOf(prefs.subtitleHoldSeconds)
         private set
@@ -73,6 +83,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val lastError = AppState.lastError
 
     init {
+        loadProviders()
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) { AppCatalog.load(context) }
             apps = list
@@ -200,25 +211,105 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectCloudEnabled(value: Boolean) {
         if (cloudEnabled == value) return
+        saveDraft()
         cloudEnabled = value
         prefs.cloudEnabled = value
         refreshReady()
         if (isSessionActive()) RecognitionService.refresh(context)
     }
 
+    fun updateCloudName(value: String) {
+        cloudName = value
+    }
+
     fun updateCloudBaseUrl(value: String) {
         cloudBaseUrl = value
-        prefs.cloudBaseUrl = value
     }
 
     fun updateCloudApiKey(value: String) {
         cloudApiKey = value
-        prefs.cloudApiKey = value
     }
 
     fun updateCloudModel(value: String) {
         cloudModel = value
-        prefs.cloudModel = value
+    }
+
+    fun updateCloudExtraJson(value: String) {
+        cloudExtraJson = value
+    }
+
+    fun selectProvider(id: String) {
+        if (id == activeProviderId) return
+        saveDraft()
+        activateProvider(id)
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
+
+    fun addProvider() {
+        saveDraft()
+        val provider = CloudProvider(
+            id = UUID.randomUUID().toString(),
+            name = "供应商 ${providers.size + 1}",
+            baseUrl = "",
+            apiKey = "",
+            model = "",
+        )
+        providers = providers + provider
+        prefs.saveCloudProviders(providers)
+        activateProvider(provider.id)
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
+
+    fun deleteActiveProvider() {
+        if (providers.size <= 1) return
+        val remaining = providers.filterNot { it.id == activeProviderId }
+        providers = remaining
+        prefs.saveCloudProviders(remaining)
+        activateProvider(remaining.first().id)
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
+
+    private fun loadProviders() {
+        val loaded = prefs.cloudProviders()
+        providers = loaded
+        val active = prefs.activeProviderId
+            .takeIf { candidate -> loaded.any { it.id == candidate } }
+            ?: loaded.first().id
+        activateProvider(active, persist = false)
+    }
+
+    private fun activateProvider(id: String, persist: Boolean = true) {
+        val provider = providers.firstOrNull { it.id == id } ?: return
+        activeProviderId = provider.id
+        cloudName = provider.name
+        cloudBaseUrl = provider.baseUrl
+        cloudApiKey = provider.apiKey
+        cloudModel = provider.model
+        cloudExtraJson = provider.extraJson
+        if (persist) prefs.activeProviderId = provider.id
+    }
+
+    private fun saveDraft() {
+        if (providers.isEmpty()) return
+        val updated = providers.map { provider ->
+            if (provider.id == activeProviderId) {
+                provider.copy(
+                    name = cloudName.ifBlank { "未命名供应商" },
+                    baseUrl = cloudBaseUrl.trim(),
+                    apiKey = cloudApiKey.trim(),
+                    model = cloudModel.trim(),
+                    extraJson = cloudExtraJson.trim(),
+                )
+            } else {
+                provider
+            }
+        }
+        providers = updated
+        prefs.saveCloudProviders(updated)
+        prefs.activeProviderId = activeProviderId
     }
 
     fun selectSubtitleHold(seconds: Int) {
@@ -231,6 +322,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 编辑完地址/Key/模型后，让运行中的会话立即用新配置重建引擎。 */
     fun applyCloudConfig() {
+        saveDraft()
         refreshReady()
         if (isSessionActive()) RecognitionService.refresh(context)
     }
