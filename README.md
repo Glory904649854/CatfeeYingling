@@ -62,7 +62,13 @@ adb push ggml-small-q5_1.bin /sdcard/Android/data/com.catfee.yingling/files/mode
 
 3. App 内「翻译方向」把源语言设为中文、输出设为英语；启动后引擎标签会变成 `WHISPER`。
 
-> 中端机跑 Whisper small 的 30 秒编码窗口偏慢，首条字幕可能需要数十秒；追求速度可换 `ggml-base-q5_1.bin`（约 57MB，质量下降），或在 `whisper_jni.cpp` 里调小 `params.audio_ctx`。
+> 中端机跑 Whisper 的实测（Redmi Note 9 / 天玑 800U，`-O3` 原生库）：
+> - small q5：4.8 秒音频 → 约 12.4 秒出英文
+> - base q5：8.9 秒音频 → 约 12.2 秒出英文（覆盖更长，质量略低）
+>
+> 注意：AGP 的 debug 变体默认用 `-O0` 编译 native，会让 whisper 慢到 90 秒都算不完；
+> 项目已在 `app/src/main/cpp/CMakeLists.txt` 里强制 debug 也使用 `-O3`。
+> 追求更快可换 `ggml-base-q5_1.bin`（约 57MB，质量下降），或调小 `whisper_jni.cpp` 里的 `params.audio_ctx`。
 
 > 提示：若目标应用设置 `allowAudioPlaybackCapture=false`、使用 DRM 或 targetSdk < 29 且未开启采集，则系统不会提供音频，悬浮窗只会显示静默声浪。
 
@@ -125,7 +131,8 @@ AudioPlaybackCaptureConfiguration.Builder(mediaProjection)
 - **隐私提示**：采集期间系统会显示录音/麦克风隐私标识，这是系统行为，无法隐藏。
 - **未 root 无法全局强采**：要突破应用自拒绝，只能系统签名/提权，普通应用做不到。
 - **Demo 引擎只模拟台词**，不产生真实识别结果。
-- **Whisper small 在中端机上不实时的风险**：Whisper 固定 30 秒编码窗口，Redmi Note 9 级别设备单段推理可能需要数十秒；需要实时性时换 base 模型或调小 `audio_ctx`。
+- **Whisper 在中端机上不是实时字幕**：Redmi Note 9 实测每段约 12 秒出结果（small/base 相近，base 覆盖音频更长）。要做到 1~2 秒级延迟，需要换成流式 ASR（sherpa-onnx zipformer / SenseVoice）+ 单独的翻译模型，或使用更高性能的设备。
+- **务必保持 native `-O3`**：debug 变体默认 `-O0`，会让 Whisper 慢 10 倍以上。
 
 ## 6. 模型接入
 

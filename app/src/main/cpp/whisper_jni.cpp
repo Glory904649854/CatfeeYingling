@@ -51,6 +51,8 @@ Java_com_catfee_yingling_engine_WhisperBridge_nativeTranscribe(
     params.suppress_blank = true;
     params.detect_language = false;
     params.temperature = 0.0f;
+    // Whisper 默认按 30 秒编码；缩短到约 15 秒，显著降低中端机单段耗时。
+    params.audio_ctx = 768;
 
     const char *lang = nullptr;
     if (language != nullptr) {

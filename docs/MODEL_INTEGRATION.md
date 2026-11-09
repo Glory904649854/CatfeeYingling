@@ -151,10 +151,14 @@ class SherpaRecognitionEngine(
 | 环节 | 参考值 |
 |---|---|
 | 采集 + 重采样 | < 5% CPU |
-| Whisper small q5 | RTF ≈ 0.25~0.5（旗舰）/ 0.4~0.7（中端） |
+| Whisper small q5（Redmi Note 9 实测） | 4.8s 音频 → 12.4s 推理 |
+| Whisper base q5（Redmi Note 9 实测） | 8.9s 音频 → 12.2s 推理 |
 | Qwen3-0.6B Q4 | 30~60 tok/s（旗舰）/ 15~30 tok/s（中端） |
 | OPUS-MT / M2M 备选 | 单句 0.05~1.5s |
-| 端到端字幕延迟 | 2~3.5s |
+| 端到端字幕延迟 | 中端机 Whisper 约 12~15s；流式 ASR 可到 2~3s |
+
+> 关键：native 必须开优化。AGP debug 变体默认 `-O0`，whisper/ggml 会慢 10 倍以上；
+> 本项目在 `app/src/main/cpp/CMakeLists.txt` 强制 debug 也使用 `-O3`。
 
 省电建议：
 

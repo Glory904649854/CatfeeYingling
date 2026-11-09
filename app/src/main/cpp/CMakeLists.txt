@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(yingling_whisper C CXX)
 
+# AGP 的 debug 变体默认用 -O0 编译 native；whisper/ggml 在 -O0 下会慢一个数量级。
+# 这里强制 debug 也开 -O3，否则实时字幕不可用。
+set(CMAKE_C_FLAGS_DEBUG "-g -O3")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O3")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

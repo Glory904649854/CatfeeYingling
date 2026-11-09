@@ -1,5 +1,7 @@
 package com.catfee.yingling.engine
 
+import android.os.SystemClock
+import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -44,8 +46,18 @@ class WhisperRecognitionEngine(
         if (started) return
         started = true
         worker.execute {
-            handle = WhisperBridge.nativeInit(modelPath)
+            val begin = SystemClock.elapsedRealtime()
+            handle = try {
+                WhisperBridge.nativeInit(modelPath)
+            } catch (t: Throwable) {
+                Log.e(TAG, "model init failed", t)
+                0L
+            }
             ready = handle != 0L
+            Log.d(
+                TAG,
+                "model load ${SystemClock.elapsedRealtime() - begin}ms ready=$ready path=$modelPath",
+            )
             if (!ready) {
                 onResult?.invoke(RecognitionResult("", "Whisper 模型加载失败", "zh"))
             }
@@ -75,23 +87,38 @@ class WhisperRecognitionEngine(
             silenceMs = 0
             speaking = false
 
-            if (pcm.size >= MIN_SAMPLES && busy.compareAndSet(false, true)) {
-                runCatching {
-                    worker.execute { transcribe(pcm) }
-                }.onFailure { busy.set(false) }
+            if (pcm.size >= MIN_SAMPLES) {
+                if (!busy.compareAndSet(false, true)) {
+                    Log.d(TAG, "drop segment ${pcm.size / 16}ms: busy")
+                } else {
+                    Log.d(TAG, "segment ${pcm.size / 16}ms -> queue")
+                    runCatching {
+                        worker.execute { transcribe(pcm) }
+                    }.onFailure {
+                        busy.set(false)
+                        Log.e(TAG, "queue failed", it)
+                    }
+                }
             }
         }
     }
 
     private fun transcribe(pcm: ShortArray) {
+        val begin = SystemClock.elapsedRealtime()
         try {
             val text = runCatching {
                 WhisperBridge.nativeTranscribe(handle, pcm, translateToEnglish, sourceLanguage)
             }.getOrElse {
+                Log.e(TAG, "nativeTranscribe failed", it)
                 onResult?.invoke(RecognitionResult("", "Whisper 推理失败", "zh"))
                 ""
             }
-            if (text.isBlank()) return
+            val elapsed = SystemClock.elapsedRealtime() - begin
+            Log.d(TAG, "transcribe ${pcm.size / 16}ms -> ${elapsed}ms chars=${text.length}")
+            if (text.isBlank()) {
+                Log.d(TAG, "empty result")
+                return
+            }
             val lang = if (translateToEnglish) "en" else (sourceLanguage ?: "zh")
             onResult?.invoke(
                 RecognitionResult(
@@ -159,6 +186,7 @@ class WhisperRecognitionEngine(
     }
 
     private companion object {
+        const val TAG = "YingLingWhisper"
         const val SPEECH_LEVEL = 0.20f
         const val SILENCE_MS = 550
         const val MIN_SPEECH_MS = 700
