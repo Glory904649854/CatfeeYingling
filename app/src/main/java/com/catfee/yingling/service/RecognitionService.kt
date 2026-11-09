@@ -28,6 +28,7 @@ import com.catfee.yingling.core.AppState
 import com.catfee.yingling.core.Languages
 import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
+import com.catfee.yingling.core.SubtitleLine
 import com.catfee.yingling.engine.DemoRecognitionEngine
 import com.catfee.yingling.engine.ModelStore
 import com.catfee.yingling.engine.SenseVoiceEngine
@@ -142,6 +143,8 @@ class RecognitionService : Service() {
         AppState.lastError.value = null
         AppState.status.value = SessionStatus.STARTING
         AppState.direction.value = Languages.direction(prefs.sourceLang, prefs.targetLang)
+        AppState.history.value = emptyList()
+        AppState.liveSource.value = ""
         refreshScopeLabel()
 
         // Android 14+：mediaProjection 类型的前台服务必须先启动，再兑换 MediaProjection
@@ -231,15 +234,18 @@ class RecognitionService : Service() {
     }
 
     private fun publishResult(result: RecognitionResult) {
-        // partial 只更新中文；翻译结果为空时保留上一条英文，避免字幕闪回“等待语音”
-        if (result.sourceText.isNotBlank()) {
+        if (result.translatedText.isNotBlank() && result.sourceText.isNotBlank()) {
+            val line = SubtitleLine(result.sourceText, result.translatedText)
+            AppState.history.value = (AppState.history.value + line).takeLast(MAX_HISTORY)
+            AppState.liveSource.value = ""
+            AppState.sourceText.value = result.sourceText
+            AppState.translatedText.value = result.translatedText
+        } else if (result.sourceText.isNotBlank()) {
+            AppState.liveSource.value = result.sourceText
             AppState.sourceText.value = result.sourceText
         }
-        if (result.translatedText.isNotBlank()) {
-            AppState.translatedText.value = result.translatedText
-        }
         main.post {
-            overlay?.setText(AppState.sourceText.value, AppState.translatedText.value)
+            overlay?.setTranscript(AppState.history.value, AppState.liveSource.value)
         }
     }
 
@@ -283,6 +289,8 @@ class RecognitionService : Service() {
         AppState.status.value = SessionStatus.IDLE
         AppState.sourceText.value = ""
         AppState.translatedText.value = ""
+        AppState.history.value = emptyList()
+        AppState.liveSource.value = ""
         AppState.level.value = 0f
         AppState.boundApps.value = 0
         AppState.overlayVisible.value = false
@@ -404,7 +412,7 @@ class RecognitionService : Service() {
         val shown = controller.show(AppState.direction.value, scopeLabel())
         AppState.overlayVisible.value = shown
         controller.setStatus(AppState.status.value)
-        controller.setText(AppState.sourceText.value, AppState.translatedText.value)
+        controller.setTranscript(AppState.history.value, AppState.liveSource.value)
     }
 
     private fun toggleOverlay() {
@@ -534,6 +542,7 @@ class RecognitionService : Service() {
 
         private const val CHANNEL_ID = "yingling_session"
         private const val NOTIFICATION_ID = 1001
+        private const val MAX_HISTORY = 3
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_RESULT_DATA = "extra_result_data"
 

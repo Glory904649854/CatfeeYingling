@@ -16,12 +16,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.catfee.yingling.core.SessionStatus
+import com.catfee.yingling.core.SubtitleLine
 import kotlin.math.abs
 import kotlin.math.min
 
 /**
- * 极简悬浮窗：只保留“中文原文 + 英文译文”，控制按钮收进顶栏。
- * 不限制行数，长句可在窗内滚动查看完整内容。
+ * 紧凑悬浮窗：保留最近几句的“原文 + 译文”，最新一句在底部。
+ * 顶部一行状态/方向/控制，下面滚动字幕；长句可完整阅读。
  */
 class OverlayController(
     private val context: Context,
@@ -40,12 +41,13 @@ class OverlayController(
     private var params: WindowManager.LayoutParams? = null
     private var body: LinearLayout? = null
     private var scroll: MaxScrollView? = null
+    private var transcriptBox: LinearLayout? = null
+    private var liveView: TextView? = null
     private var dot: View? = null
     private var directionView: TextView? = null
-    private var sourceView: TextView? = null
-    private var targetView: TextView? = null
     private var pauseView: TextView? = null
 
+    private var lastHistoryKey = ""
     private var collapsed = false
 
     val isShowing: Boolean get() = root != null
@@ -89,20 +91,26 @@ class OverlayController(
         val view = root ?: return
         root = null
         params = null
+        lastHistoryKey = ""
         runCatching { wm.removeView(view) }
     }
 
-    fun setText(source: String, target: String) {
-        sourceView?.text = source.ifBlank { "—" }
-        targetView?.text = target.ifBlank { "等待语音…" }
-        scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
+    /** 渲染最近几句字幕 + 当前识别中的一行。 */
+    fun setTranscript(history: List<SubtitleLine>, live: String) {
+        val key = history.joinToString("\u0001") { it.source + "\u0002" + it.translated }
+        if (key != lastHistoryKey) {
+            lastHistoryKey = key
+            rebuild(history, live)
+            scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
+        } else {
+            updateLive(live)
+        }
     }
 
     fun setDirection(direction: String) {
         directionView?.text = direction
     }
 
-    /** 悬浮窗不再展示应用数量，保留空实现兼容服务调用。 */
     fun setScope(scopeLabel: String) = Unit
 
     fun setStatus(status: SessionStatus) {
@@ -115,7 +123,8 @@ class OverlayController(
         }
         dot?.background = circle(color)
         if (status == SessionStatus.ERROR) {
-            targetView?.text = "音频采集异常"
+            liveView?.text = "音频采集异常"
+            liveView?.visibility = View.VISIBLE
         }
     }
 
@@ -227,30 +236,93 @@ class OverlayController(
         bodyView.addView(scroller, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) })
         scroll = scroller
 
-        val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        scroller.addView(content, LinearLayout.LayoutParams(MATCH, WRAP))
+        val box = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        scroller.addView(box, LinearLayout.LayoutParams(MATCH, WRAP))
+        transcriptBox = box
 
-        val source = TextView(context).apply {
-            text = "—"
-            setTextColor(Colors.muted)
-            textSize = 10.5f
-            setLineSpacing(0f, 1.08f)
-        }
-        content.addView(source, LinearLayout.LayoutParams(MATCH, WRAP))
-        sourceView = source
-
-        val target = TextView(context).apply {
+        // 初始占位
+        val placeholder = TextView(context).apply {
             text = "等待语音…"
-            setTextColor(Colors.text)
-            textSize = 16f
-            setLineSpacing(0f, 1.08f)
-            setPadding(0, dp(2), 0, 0)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Colors.muted)
+            textSize = 14f
         }
-        content.addView(target, LinearLayout.LayoutParams(MATCH, WRAP))
-        targetView = target
+        box.addView(placeholder, LinearLayout.LayoutParams(MATCH, WRAP))
+        liveView = placeholder
 
         return container
+    }
+
+    private fun rebuild(history: List<SubtitleLine>, live: String) {
+        val box = transcriptBox ?: return
+        box.removeAllViews()
+
+        if (history.isEmpty() && live.isBlank()) {
+            val placeholder = TextView(context).apply {
+                text = "等待语音…"
+                setTextColor(Colors.muted)
+                textSize = 14f
+            }
+            box.addView(placeholder, LinearLayout.LayoutParams(MATCH, WRAP))
+            liveView = placeholder
+            return
+        }
+
+        history.forEach { line ->
+            val source = TextView(context).apply {
+                text = line.source
+                setTextColor(Colors.muted)
+                textSize = 9.5f
+                setLineSpacing(0f, 1.05f)
+                setPadding(0, dp(2), 0, 0)
+            }
+            box.addView(source, LinearLayout.LayoutParams(MATCH, WRAP))
+
+            val target = TextView(context).apply {
+                text = line.translated
+                setTextColor(Colors.text)
+                textSize = 15f
+                setLineSpacing(0f, 1.08f)
+                setPadding(0, dp(1), 0, dp(7))
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            }
+            box.addView(target, LinearLayout.LayoutParams(MATCH, WRAP))
+        }
+
+        val liveTextView = TextView(context).apply {
+            text = live
+            setTextColor(Colors.muted)
+            textSize = 10f
+            setLineSpacing(0f, 1.05f)
+            typeface = Typeface.create("sans-serif", Typeface.ITALIC)
+            visibility = if (live.isBlank()) View.GONE else View.VISIBLE
+        }
+        box.addView(liveTextView, LinearLayout.LayoutParams(MATCH, WRAP))
+        liveView = liveTextView
+    }
+
+    private fun updateLive(live: String) {
+        val view = liveView ?: return
+        if (live.isBlank()) {
+            if (transcriptBox?.childCount == 1) {
+                view.text = "等待语音…"
+                view.visibility = View.VISIBLE
+            } else {
+                view.visibility = View.GONE
+            }
+        } else {
+            view.text = live
+            view.visibility = View.VISIBLE
+        }
+        maybeScrollToBottom()
+    }
+
+    private fun maybeScrollToBottom() {
+        val s = scroll ?: return
+        val content = s.getChildAt(0) ?: return
+        val nearBottom = s.scrollY + s.height >= content.height - dp(48)
+        if (nearBottom) {
+            s.post { s.fullScroll(View.FOCUS_DOWN) }
+        }
     }
 
     private fun installDrag(handle: View) {
@@ -334,7 +406,6 @@ class OverlayController(
             setColor(color)
         }
 
-    /** 限制最大高度的滚动容器：长句可完整阅读，窗口不会盖满屏幕。 */
     private class MaxScrollView(context: Context, private val maxHeightPx: Int) : ScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val spec = MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST)
