@@ -22,7 +22,7 @@ import kotlin.math.min
 
 /**
  * 紧凑悬浮窗：保留最近几句“原文 + 译文”，新句滑入，
- * 每句停留约 12 秒后渐隐移除，不会一直堆在窗口上。
+ * 每句停留 6 秒后渐隐移除，不会一直堆在窗口上。
  */
 class OverlayController(
     private val context: Context,
@@ -135,7 +135,7 @@ class OverlayController(
 
     fun setStatus(status: SessionStatus) {
         val color = when (status) {
-            SessionStatus.RUNNING -> Colors.mint
+            SessionStatus.RUNNING -> Colors.cyan
             SessionStatus.PAUSED -> Colors.paused
             SessionStatus.STARTING -> Colors.blue
             SessionStatus.ERROR -> Colors.danger
@@ -149,7 +149,7 @@ class OverlayController(
     }
 
     fun setPaused(paused: Boolean) {
-        dot?.background = circle(if (paused) Colors.paused else Colors.mint)
+        dot?.background = circle(if (paused) Colors.paused else Colors.cyan)
         pauseView?.text = if (paused) "继续" else "暂停"
     }
 
@@ -171,7 +171,7 @@ class OverlayController(
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val statusDot = View(context).apply { background = circle(Colors.mint) }
+        val statusDot = View(context).apply { background = circle(Colors.cyan) }
         header.addView(statusDot, LinearLayout.LayoutParams(dp(6), dp(6)))
         dot = statusDot
 
@@ -185,7 +185,7 @@ class OverlayController(
 
         val dir = TextView(context).apply {
             text = direction
-            setTextColor(Colors.mint)
+            setTextColor(Colors.cyan)
             textSize = 8.5f
             gravity = Gravity.CENTER
             setPadding(dp(6), dp(2), dp(6), dp(2))
@@ -198,7 +198,7 @@ class OverlayController(
 
         val pause = TextView(context).apply {
             text = "暂停"
-            setTextColor(Colors.mint)
+            setTextColor(Colors.cyan)
             textSize = 9f
             setPadding(dp(6), dp(4), dp(6), dp(4))
             isClickable = true
@@ -472,15 +472,15 @@ class OverlayController(
     }
 
     private object Colors {
-        val bg: Int = Color.argb(246, 15, 20, 25)
-        val border: Int = Color.argb(30, 255, 255, 255)
-        val text: Int = Color.rgb(238, 244, 247)
-        val muted: Int = Color.rgb(138, 151, 162)
-        val mint: Int = Color.rgb(91, 231, 196)
-        val blue: Int = Color.rgb(76, 194, 255)
-        val danger: Int = Color.rgb(255, 139, 139)
+        val bg: Int = Color.argb(246, 6, 18, 43)
+        val border: Int = Color.argb(42, 95, 227, 253)
+        val text: Int = Color.rgb(242, 248, 255)
+        val muted: Int = Color.rgb(157, 180, 217)
+        val cyan: Int = Color.rgb(95, 227, 253)
+        val blue: Int = Color.rgb(47, 123, 255)
+        val danger: Int = Color.rgb(255, 139, 154)
         val paused: Int = Color.rgb(255, 184, 107)
-        val chipBg: Int = Color.argb(26, 91, 231, 196)
+        val chipBg: Int = Color.argb(32, 95, 227, 253)
     }
 
     private companion object {

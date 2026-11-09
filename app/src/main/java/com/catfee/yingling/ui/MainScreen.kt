@@ -42,7 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.catfee.yingling.ui.theme.Bg
 import com.catfee.yingling.ui.theme.Blue
 import com.catfee.yingling.ui.theme.BorderDark
-import com.catfee.yingling.ui.theme.Mint
+import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.TextTertiary
 
 @Composable
@@ -73,18 +73,18 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
 @Composable
 private fun AmbientBackground() {
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF0B1116), Bg)))
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF071633), Bg)))
 
-        val mintRadius = size.width * 0.9f
-        val mintCenter = Offset(size.width * 0.92f, size.height * 0.02f)
+        val cyanRadius = size.width * 0.9f
+        val cyanCenter = Offset(size.width * 0.92f, size.height * 0.02f)
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Mint.copy(alpha = 0.10f), Color.Transparent),
-                center = mintCenter,
-                radius = mintRadius,
+                colors = listOf(Cyan.copy(alpha = 0.10f), Color.Transparent),
+                center = cyanCenter,
+                radius = cyanRadius,
             ),
-            radius = mintRadius,
-            center = mintCenter,
+            radius = cyanRadius,
+            center = cyanCenter,
         )
 
         val blueRadius = size.width * 0.8f
@@ -134,16 +134,16 @@ private fun BottomBar(current: Int, onSelect: (Int) -> Unit) {
                         .weight(1f)
                         .height(44.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (selected) Mint.copy(alpha = 0.10f) else Color.Transparent)
+                        .background(if (selected) Cyan.copy(alpha = 0.10f) else Color.Transparent)
                         .clickable { onSelect(index) },
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NavGlyphView(item.second, if (selected) Mint else TextTertiary)
+                    NavGlyphView(item.second, if (selected) Cyan else TextTertiary)
                     Spacer(Modifier.width(7.dp))
                     Text(
                         text = item.first,
-                        color = if (selected) Mint else TextTertiary,
+                        color = if (selected) Cyan else TextTertiary,
                         fontSize = 12.sp,
                         fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                         style = MaterialTheme.typography.labelLarge,

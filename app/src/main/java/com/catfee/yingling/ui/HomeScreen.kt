@@ -69,7 +69,7 @@ import com.catfee.yingling.ui.components.TagChip
 import com.catfee.yingling.ui.theme.Blue
 import com.catfee.yingling.ui.theme.BorderDark
 import com.catfee.yingling.ui.theme.Danger
-import com.catfee.yingling.ui.theme.Mint
+import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
@@ -348,7 +348,7 @@ private fun LiveCard(
         if (status == SessionStatus.RUNNING || status == SessionStatus.PAUSED) {
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                StatusDot(if (overlayVisible) Mint else TextTertiary, 6.dp)
+                StatusDot(if (overlayVisible) Cyan else TextTertiary, 6.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = if (overlayVisible) "悬浮字幕窗已显示" else "悬浮字幕窗已隐藏",
@@ -358,7 +358,7 @@ private fun LiveCard(
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = if (overlayVisible) "隐藏" else "显示",
-                    color = Mint,
+                    color = Cyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.clickable(onClick = onToggleOverlay),
@@ -459,7 +459,7 @@ private fun AppsCard(
         SectionTitle("监听应用") {
             Text(
                 text = "管理 ›",
-                color = Mint,
+                color = Cyan,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.clickable(onClick = onOpenApps),
@@ -596,7 +596,7 @@ private fun PermissionRow(
             Modifier
                 .size(6.dp)
                 .clip(CircleShape)
-                .background(if (granted) Mint else Warning),
+                .background(if (granted) Cyan else Warning),
         )
         Spacer(Modifier.width(9.dp))
         Text(
@@ -607,7 +607,7 @@ private fun PermissionRow(
         Spacer(Modifier.weight(1f))
         Text(
             text = if (granted) "已授权" else "去授权",
-            color = if (granted) Mint.copy(alpha = 0.7f) else Mint,
+            color = if (granted) Cyan.copy(alpha = 0.7f) else Cyan,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             modifier = if (granted) Modifier else Modifier.clickable(onClick = onGrant),
@@ -644,7 +644,7 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
 }
 
 private fun statusColor(status: SessionStatus): Color = when (status) {
-    SessionStatus.RUNNING -> Mint
+    SessionStatus.RUNNING -> Cyan
     SessionStatus.PAUSED -> Warning
     SessionStatus.STARTING -> Blue
     SessionStatus.ERROR -> Danger

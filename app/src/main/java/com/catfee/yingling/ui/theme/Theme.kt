@@ -9,12 +9,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 private val YingLingColors = darkColorScheme(
-    primary = Mint,
-    onPrimary = Color(0xFF04120E),
-    primaryContainer = Color(0xFF12312B),
-    onPrimaryContainer = Mint,
+    primary = Cyan,
+    onPrimary = Color(0xFF04122E),
+    primaryContainer = Color(0xFF0B2A55),
+    onPrimaryContainer = IceCyan,
     secondary = Blue,
-    onSecondary = Color(0xFF04121A),
+    onSecondary = Color(0xFFF2F8FF),
     background = Bg,
     onBackground = TextPrimary,
     surface = SurfaceDark,
@@ -23,7 +23,7 @@ private val YingLingColors = darkColorScheme(
     onSurfaceVariant = TextSecondary,
     outline = BorderDark,
     error = Danger,
-    onError = Color(0xFF200606),
+    onError = Color(0xFF2A060A),
 )
 
 private val YingLingShapes = Shapes(

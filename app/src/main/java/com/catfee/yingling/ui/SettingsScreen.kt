@@ -43,7 +43,7 @@ import com.catfee.yingling.ui.components.HairLine
 import com.catfee.yingling.ui.components.SectionCard
 import com.catfee.yingling.ui.components.SectionTitle
 import com.catfee.yingling.ui.theme.BorderDark
-import com.catfee.yingling.ui.theme.Mint
+import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
@@ -159,8 +159,8 @@ fun SettingsScreen(vm: MainViewModel) {
                     checked = vm.cloudEnabled,
                     onCheckedChange = vm::selectCloudEnabled,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color(0xFF04120E),
-                        checkedTrackColor = Mint,
+                        checkedThumbColor = Color(0xFF04122E),
+                        checkedTrackColor = Cyan,
                         uncheckedThumbColor = TextTertiary,
                         uncheckedTrackColor = SurfaceHigh,
                     ),
@@ -204,7 +204,7 @@ fun SettingsScreen(vm: MainViewModel) {
             ) {
                 Text(
                     text = "应用配置",
-                    color = Mint,
+                    color = Cyan,
                     fontSize = 12.5f.sp,
                     fontWeight = FontWeight.Medium,
                 )
@@ -242,8 +242,8 @@ fun SettingsScreen(vm: MainViewModel) {
                     enabled = active,
                     onCheckedChange = { RecognitionService.toggleOverlay(context) },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color(0xFF04120E),
-                        checkedTrackColor = Mint,
+                        checkedThumbColor = Color(0xFF04122E),
+                        checkedTrackColor = Cyan,
                         uncheckedThumbColor = TextTertiary,
                         uncheckedTrackColor = SurfaceHigh,
                     ),
@@ -320,12 +320,12 @@ private fun CloudField(
         },
         textStyle = MaterialTheme.typography.bodySmall,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Mint,
+            focusedBorderColor = Cyan,
             unfocusedBorderColor = BorderDark,
             focusedTextColor = TextPrimary,
             unfocusedTextColor = TextPrimary,
-            cursorColor = Mint,
-            focusedLabelColor = Mint,
+            cursorColor = Cyan,
+            focusedLabelColor = Cyan,
             unfocusedLabelColor = TextTertiary,
             focusedContainerColor = Color.Transparent,
             unfocusedContainerColor = Color.Transparent,
@@ -354,7 +354,7 @@ private fun EngineRow(
             Modifier
                 .size(18.dp)
                 .clip(CircleShape)
-                .border(1.5.dp, if (selected) Mint else BorderDark, CircleShape),
+                .border(1.5.dp, if (selected) Cyan else BorderDark, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
@@ -362,7 +362,7 @@ private fun EngineRow(
                     Modifier
                         .size(9.dp)
                         .clip(CircleShape)
-                        .background(Mint),
+                        .background(Cyan),
                 )
             }
         }
@@ -399,7 +399,7 @@ private fun EngineRow(
         } else if (selected) {
             Text(
                 text = "当前",
-                color = Mint,
+                color = Cyan,
                 fontSize = 10.5f.sp,
                 fontWeight = FontWeight.Medium,
             )

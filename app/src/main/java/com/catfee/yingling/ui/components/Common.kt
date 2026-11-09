@@ -1,6 +1,7 @@
 package com.catfee.yingling.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,16 +35,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.catfee.yingling.R
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.core.label
 import com.catfee.yingling.ui.theme.Blue
 import com.catfee.yingling.ui.theme.BorderDark
 import com.catfee.yingling.ui.theme.Danger
-import com.catfee.yingling.ui.theme.Mint
+import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
@@ -62,7 +66,7 @@ fun SectionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF151B21), Color(0xFF10151A))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF0C1D3E), Color(0xFF081733))))
             .border(1.dp, BorderDark, RoundedCornerShape(22.dp))
             .padding(18.dp),
         content = content,
@@ -109,7 +113,7 @@ fun StatusDot(
 @Composable
 fun StatusBadge(status: SessionStatus) {
     val color = when (status) {
-        SessionStatus.RUNNING -> Mint
+        SessionStatus.RUNNING -> Cyan
         SessionStatus.PAUSED -> Warning
         SessionStatus.STARTING -> Blue
         SessionStatus.ERROR -> Danger
@@ -139,9 +143,9 @@ fun TagChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) Mint.copy(alpha = 0.14f) else SurfaceHigh
-    val border = if (selected) Mint.copy(alpha = 0.45f) else BorderDark
-    val foreground = if (selected) Mint else TextSecondary
+    val background = if (selected) Cyan.copy(alpha = 0.14f) else SurfaceHigh
+    val border = if (selected) Cyan.copy(alpha = 0.45f) else BorderDark
+    val foreground = if (selected) Cyan else TextSecondary
 
     Box(
         modifier = Modifier
@@ -167,14 +171,14 @@ fun PrimaryAction(
             .height(48.dp)
             .alpha(if (enabled) 1f else 0.45f)
             .clip(RoundedCornerShape(14.dp))
-            .background(Brush.horizontalGradient(listOf(Mint, Blue)))
+            .background(Brush.horizontalGradient(listOf(Cyan, Blue)))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 22.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
-            color = Color(0xFF04120E),
+            color = Color(0xFF04122E),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -208,7 +212,7 @@ fun GhostAction(
 }
 
 @Composable
-fun MiniTag(text: String, color: Color = Mint) {
+fun MiniTag(text: String, color: Color = Cyan) {
     Text(
         text = text,
         color = color,
@@ -224,34 +228,14 @@ fun MiniTag(text: String, color: Color = Mint) {
 
 @Composable
 fun LogoMark(size: Dp = 46.dp) {
-    Canvas(Modifier.size(size)) {
-        val side = this.size.width
-        drawRoundRect(
-            brush = Brush.linearGradient(
-                colors = listOf(Mint, Blue),
-                start = Offset.Zero,
-                end = Offset(side, side),
-            ),
-            cornerRadius = CornerRadius(side * 0.32f, side * 0.32f),
-        )
-
-        val barWidth = side * 0.085f
-        val gap = side * 0.125f
-        val heights = listOf(0.22f, 0.46f, 0.62f, 0.38f, 0.18f)
-        val total = barWidth * heights.size + gap * (heights.size - 1)
-        var x = (side - total) / 2f
-        val ink = Color(0xFF07120F)
-        heights.forEach { fraction ->
-            val h = side * fraction
-            drawRoundRect(
-                color = ink,
-                topLeft = Offset(x, (side - h) / 2f),
-                size = Size(barWidth, h),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
-            )
-            x += barWidth + gap
-        }
-    }
+    Image(
+        painter = painterResource(R.drawable.logo_mark),
+        contentDescription = "应灵",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(size * 0.32f)),
+    )
 }
 
 /**
@@ -295,9 +279,9 @@ fun LiveWaveform(
         val slot = size.width / n
         val barWidth = slot * 0.52f
         val brush = if (active && !paused) {
-            Brush.horizontalGradient(listOf(Mint, Blue))
+            Brush.horizontalGradient(listOf(Cyan, Blue))
         } else {
-            Brush.horizontalGradient(listOf(Color(0xFF38434C), Color(0xFF262F37)))
+            Brush.horizontalGradient(listOf(Color(0xFF26375A), Color(0xFF1B2A4A)))
         }
 
         val idle = !active || paused

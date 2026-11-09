@@ -49,7 +49,7 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.data.AppEntry
 import com.catfee.yingling.ui.components.TagChip
 import com.catfee.yingling.ui.theme.BorderDark
-import com.catfee.yingling.ui.theme.Mint
+import com.catfee.yingling.ui.theme.Cyan
 import com.catfee.yingling.ui.theme.SurfaceDark
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
@@ -141,7 +141,7 @@ fun AppsScreen(vm: MainViewModel) {
 
         if (vm.loading) {
             Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Mint, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                CircularProgressIndicator(color = Cyan, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
         } else {
             LazyColumn(
@@ -212,7 +212,7 @@ private fun SearchField(
                 onValueChange = onValueChange,
                 singleLine = true,
                 textStyle = TextStyle(color = TextPrimary, fontSize = 13.sp),
-                cursorBrush = SolidColor(Mint),
+                cursorBrush = SolidColor(Cyan),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -242,7 +242,7 @@ private fun AppRow(
             .background(SurfaceDark)
             .border(
                 1.dp,
-                if (selected) Mint.copy(alpha = 0.35f) else BorderDark,
+                if (selected) Cyan.copy(alpha = 0.35f) else BorderDark,
                 RoundedCornerShape(16.dp),
             )
             .clickable(enabled = enabled, onClick = onToggle)
@@ -301,10 +301,10 @@ private fun AppRow(
             Modifier
                 .size(22.dp)
                 .clip(RoundedCornerShape(7.dp))
-                .background(if (selected) Mint else Color.Transparent)
+                .background(if (selected) Cyan else Color.Transparent)
                 .border(
                     1.dp,
-                    if (selected) Mint else BorderDark,
+                    if (selected) Cyan else BorderDark,
                     RoundedCornerShape(7.dp),
                 ),
             contentAlignment = Alignment.Center,
@@ -312,7 +312,7 @@ private fun AppRow(
             if (selected) {
                 Text(
                     text = "✓",
-                    color = Color(0xFF04120E),
+                    color = Color(0xFF04122E),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                 )
