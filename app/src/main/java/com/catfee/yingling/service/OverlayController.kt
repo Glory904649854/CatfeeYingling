@@ -21,8 +21,8 @@ import kotlin.math.abs
 import kotlin.math.min
 
 /**
- * 紧凑悬浮窗：保留最近几句的“原文 + 译文”，最新一句在底部。
- * 顶部一行状态/方向/控制，下面滚动字幕；长句可完整阅读。
+ * 紧凑悬浮窗：保留最近几句“原文 + 译文”，新句滑入，
+ * 每句停留约 12 秒后渐隐移除，不会一直堆在窗口上。
  */
 class OverlayController(
     private val context: Context,
@@ -47,7 +47,9 @@ class OverlayController(
     private var directionView: TextView? = null
     private var pauseView: TextView? = null
 
-    private var lastHistoryKey = ""
+    private val entries = ArrayList<Entry>()
+    private var lastLineKey = ""
+    private var currentLive = ""
     private var collapsed = false
 
     val isShowing: Boolean get() = root != null
@@ -89,22 +91,40 @@ class OverlayController(
 
     fun hide() {
         val view = root ?: return
+        clearEntries()
         root = null
         params = null
-        lastHistoryKey = ""
+        lastLineKey = ""
         runCatching { wm.removeView(view) }
     }
 
-    /** 渲染最近几句字幕 + 当前识别中的一行。 */
     fun setTranscript(history: List<SubtitleLine>, live: String) {
-        val key = history.joinToString("\u0001") { it.source + "\u0002" + it.translated }
-        if (key != lastHistoryKey) {
-            lastHistoryKey = key
-            rebuild(history, live)
-            scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
-        } else {
-            updateLive(live)
+        currentLive = live
+
+        if (history.isEmpty()) {
+            if (entries.isNotEmpty()) clearEntries()
+            lastLineKey = ""
+            updateLive("")
+            return
         }
+
+        val last = history.last()
+        val key = last.source + "\u0002" + last.translated
+
+        if (lastLineKey.isEmpty()) {
+            // 首次显示 / 重新打开悬浮窗：把当前历史一次性铺上
+            clearEntries()
+            history.forEach { addEntry(it, animate = false) }
+            lastLineKey = key
+            scrollToBottom(smooth = false)
+        } else if (key != lastLineKey) {
+            // 新句落定：只追加最后一句
+            addEntry(last, animate = true)
+            lastLineKey = key
+            scrollToBottom(smooth = true)
+        }
+
+        updateLive(live)
     }
 
     fun setDirection(direction: String) {
@@ -240,7 +260,6 @@ class OverlayController(
         scroller.addView(box, LinearLayout.LayoutParams(MATCH, WRAP))
         transcriptBox = box
 
-        // 初始占位
         val placeholder = TextView(context).apply {
             text = "等待语音…"
             setTextColor(Colors.muted)
@@ -252,58 +271,81 @@ class OverlayController(
         return container
     }
 
-    private fun rebuild(history: List<SubtitleLine>, live: String) {
+    private fun addEntry(line: SubtitleLine, animate: Boolean) {
         val box = transcriptBox ?: return
-        box.removeAllViews()
 
-        if (history.isEmpty() && live.isBlank()) {
-            val placeholder = TextView(context).apply {
-                text = "等待语音…"
-                setTextColor(Colors.muted)
-                textSize = 14f
-            }
-            box.addView(placeholder, LinearLayout.LayoutParams(MATCH, WRAP))
-            liveView = placeholder
-            return
+        val entry = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(2), 0, dp(6))
         }
 
-        history.forEach { line ->
-            val source = TextView(context).apply {
-                text = line.source
-                setTextColor(Colors.muted)
-                textSize = 9.5f
-                setLineSpacing(0f, 1.05f)
-                setPadding(0, dp(2), 0, 0)
-            }
-            box.addView(source, LinearLayout.LayoutParams(MATCH, WRAP))
-
-            val target = TextView(context).apply {
-                text = line.translated
-                setTextColor(Colors.text)
-                textSize = 15f
-                setLineSpacing(0f, 1.08f)
-                setPadding(0, dp(1), 0, dp(7))
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            }
-            box.addView(target, LinearLayout.LayoutParams(MATCH, WRAP))
-        }
-
-        val liveTextView = TextView(context).apply {
-            text = live
+        val source = TextView(context).apply {
+            text = line.source
             setTextColor(Colors.muted)
-            textSize = 10f
+            textSize = 9.5f
             setLineSpacing(0f, 1.05f)
-            typeface = Typeface.create("sans-serif", Typeface.ITALIC)
-            visibility = if (live.isBlank()) View.GONE else View.VISIBLE
         }
-        box.addView(liveTextView, LinearLayout.LayoutParams(MATCH, WRAP))
-        liveView = liveTextView
+        entry.addView(source, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        val target = TextView(context).apply {
+            text = line.translated
+            setTextColor(Colors.text)
+            textSize = 15f
+            setLineSpacing(0f, 1.08f)
+            setPadding(0, dp(1), 0, 0)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        entry.addView(target, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        if (animate) {
+            entry.alpha = 0f
+            entry.translationY = dp(10).toFloat()
+        }
+
+        val live = liveView
+        val index = if (live != null && live.parent === box) box.indexOfChild(live) else box.childCount
+        box.addView(entry, index, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        if (animate) {
+            entry.animate().alpha(1f).translationY(0f).setDuration(240).start()
+        }
+
+        val fade = Runnable { fadeOut(entry) }
+        entry.postDelayed(fade, HOLD_MS)
+        entries.add(Entry(entry, fade))
+    }
+
+    private fun fadeOut(view: View) {
+        view.animate()
+            .alpha(0f)
+            .setDuration(FADE_MS)
+            .withEndAction {
+                transcriptBox?.removeView(view)
+                entries.removeAll { it.view === view }
+                if (entries.isEmpty() && currentLive.isBlank()) {
+                    liveView?.text = "等待语音…"
+                    liveView?.visibility = View.VISIBLE
+                }
+                scrollToBottom(smooth = false)
+            }
+            .start()
+    }
+
+    private fun clearEntries() {
+        val box = transcriptBox ?: return
+        entries.forEach { entry ->
+            entry.view.removeCallbacks(entry.fade)
+            box.removeView(entry.view)
+        }
+        entries.clear()
     }
 
     private fun updateLive(live: String) {
         val view = liveView ?: return
+        val box = transcriptBox ?: return
+
         if (live.isBlank()) {
-            if (transcriptBox?.childCount == 1) {
+            if (entries.isEmpty()) {
                 view.text = "等待语音…"
                 view.visibility = View.VISIBLE
             } else {
@@ -313,7 +355,21 @@ class OverlayController(
             view.text = live
             view.visibility = View.VISIBLE
         }
+
+        // live 行永远在最底部
+        if (view.parent === box) {
+            box.removeView(view)
+        }
+        box.addView(view, LinearLayout.LayoutParams(MATCH, WRAP))
         maybeScrollToBottom()
+    }
+
+    private fun scrollToBottom(smooth: Boolean) {
+        val s = scroll ?: return
+        s.post {
+            val y = transcriptBox?.height ?: 0
+            if (smooth) s.smoothScrollTo(0, y) else s.scrollTo(0, y)
+        }
     }
 
     private fun maybeScrollToBottom() {
@@ -406,6 +462,8 @@ class OverlayController(
             setColor(color)
         }
 
+    private data class Entry(val view: View, val fade: Runnable)
+
     private class MaxScrollView(context: Context, private val maxHeightPx: Int) : ScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val spec = MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST)
@@ -428,5 +486,7 @@ class OverlayController(
     private companion object {
         const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
         const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
+        const val HOLD_MS = 12_000L
+        const val FADE_MS = 650L
     }
 }
