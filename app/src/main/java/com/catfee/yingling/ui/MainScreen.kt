@@ -34,6 +34,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,9 +65,10 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                     0 -> HomeScreen(
                         vm,
                         onOpenApps = { tab = 1 },
-                        onOpenSettings = { tab = 2 },
+                        onOpenSettings = { tab = 3 },
                     )
                     1 -> AppsScreen(vm)
+                    2 -> HistoryScreen(vm)
                     else -> SettingsScreen(vm)
                 }
             }
@@ -110,6 +112,7 @@ private fun BottomBar(current: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
         "实时" to NavGlyph.Live,
         "应用" to NavGlyph.Apps,
+        "历史" to NavGlyph.History,
         "设置" to NavGlyph.Settings,
     )
 
@@ -158,7 +161,7 @@ private fun BottomBar(current: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-private enum class NavGlyph { Live, Apps, Settings }
+private enum class NavGlyph { Live, Apps, History, Settings }
 
 @Composable
 private fun NavGlyphView(glyph: NavGlyph, color: Color, size: Dp = 17.dp) {
@@ -195,6 +198,29 @@ private fun NavGlyphView(glyph: NavGlyph, color: Color, size: Dp = 17.dp) {
                         cornerRadius = CornerRadius(r * 0.5f, r * 0.5f),
                     )
                 }
+            }
+
+            NavGlyph.History -> {
+                drawCircle(
+                    color = color,
+                    radius = w * 0.34f,
+                    center = Offset(w * 0.5f, h * 0.5f),
+                    style = Stroke(width = w * 0.075f),
+                )
+                drawLine(
+                    color = color,
+                    start = Offset(w * 0.5f, h * 0.5f),
+                    end = Offset(w * 0.5f, h * 0.28f),
+                    strokeWidth = w * 0.075f,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = color,
+                    start = Offset(w * 0.5f, h * 0.5f),
+                    end = Offset(w * 0.65f, h * 0.57f),
+                    strokeWidth = w * 0.075f,
+                    cap = StrokeCap.Round,
+                )
             }
 
             NavGlyph.Settings -> {

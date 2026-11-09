@@ -13,7 +13,8 @@
 - **模型自动下载**：首次使用在设置页下载，Wi‑Fi 下自动开始；通知栏和设置页显示总进度、当前文件、速度与剩余时间，支持断点续传，完成后自动启用。
 - **流式 ASR**：中文/英文用 sherpa-onnx 流式 zipformer；日/韩/英用 SenseVoice 离线多语种识别。
 - **逐句翻译**：默认 Qwen2.5-0.5B-Instruct（llama.cpp）；可在设置中开启云端 LLM（自定义 Base URL / Key / 模型），云端失败自动回退本地。支持目标中文或英文；日/韩/英 → 中、中 → 英。
-- **AI Studio 风格本体**：深海军蓝底、亮青→宝蓝渐变、22dp 圆角、三页导航；应用图标与整体配色取自项目 LOGO。
+- **历史记录**：按监听会话归档，记录来源 App、起止时间、语言方向，以及每句原文 + 译文；支持搜索、展开回看、清空，本地持久化。
+- **AI Studio 风格本体**：深海军蓝底、亮青→宝蓝渐变、22dp 圆角、四页导航；应用图标与整体配色取自项目 LOGO。
 
 ## 2. 架构
 
@@ -85,7 +86,22 @@ gradlew.bat assembleDebug
 > 自定义 Base URL 若使用 `http://`，应用已允许明文流量（`usesCleartextTraffic`）；
 > 公网服务建议使用 HTTPS。
 
-## 6. 实测（Redmi Note 9 / Android 12 / 天玑 800U）
+## 6. 历史记录
+
+- 每次启动监听创建一个会话，记录开始/结束时间、语言方向、来源 App。
+- 每句翻译落定后，记录时间戳、原文、译文和当时的来源 App。
+- 历史页在底部导航「历史」：
+  - 按会话倒序展示，显示 App、时间段、方向、条数；
+  - 点「展开」查看完整原文和译文，可长按选择复制；
+  - 支持按原文 / 译文 / App 搜索；
+  - 支持清空全部记录。
+- 本地保存到应用私有目录 `files/translation_history.json`，最多保留 200 个会话 / 5000 条字幕，不上传。
+- 来源 App 识别：
+  - 绑定单个应用监听时，直接记录该应用；
+  - 「全部媒体」模式建议在设置授予「使用情况访问」权限，用最近前台应用精确识别；
+  - 未授权且无法从音频会话解析时，记录为「全部媒体应用」。
+
+## 7. 实测（Redmi Note 9 / Android 12 / 天玑 800U）
 
 - 中文 partial：约 250ms 更新一次，识别准确率明显优于 Vosk 小模型。
 - 日 → 中：SenseVoice 识别日语（6.1s 音频）→ 本地 Qwen 中文，翻译约 2.3s；DeepSeek 云端约 1.0s。
@@ -102,31 +118,34 @@ gradlew.bat assembleDebug
 > 翻译质量说明：0.5B 模型能读懂，但偏生硬，专有名词容易出错。
 > 追求质量换 Qwen2.5-1.5B（更慢）、或接云端翻译。Q4_0 量化版在本机实测反而更慢/更容易跑偏，默认仍用 Q4_K_M。
 
-## 7. 已知限制
+## 8. 已知限制
 
 - 当前端到端支持：**中 → 英、英 → 中、日 → 中、韩 → 中**；法/俄语音识别暂未接入。
 - 日/韩译文质量受 0.5B 模型限制，偏生硬；追求质量可开启云端 LLM。
 - 云端模式需要网络；无网络时自动回退本地，不会中断字幕。
 - 首次使用需下载约 1.01GB 模型，建议在 Wi‑Fi 下完成。
+- 「全部媒体」模式若要精确记录来源 App，需要授予「使用情况访问」权限；否则历史里显示监听范围。
 - 长时间运行会发热、耗电；中端机建议插电使用。
 - 被采集应用设置 `allowAudioPlaybackCapture=false`、使用 DRM 或通话音频时无法采集。
 - Android 14+ 前台服务必须从可见界面启动；MIUI 对悬浮窗权限有额外管控。
 
-## 8. 目录
+## 9. 目录
 
 ```
 app/src/main/java/com/catfee/yingling/
   audio/      AudioPlaybackCapture + 重采样 + 电平
+  data/       应用目录 + 翻译历史存储
   engine/     Sherpa/SenseVoice、Qwen JNI、模型目录与下载器
   service/    前台服务 + 悬浮窗 + 模型下载服务
-  ui/         Compose 三页与主题
+  ui/         Compose 四页与主题
+  util/       权限、网络、来源 App 识别
 app/src/main/cpp/
   llama_jni.cpp  Qwen 推理 JNI
   CMakeLists.txt 只编译 llama.cpp（-O3 + dotprod）
 scripts/fetch-llama.ps1
 ```
 
-## 9. 许可
+## 10. 许可
 
 - sherpa-onnx：Apache-2.0
 - llama.cpp：MIT

@@ -13,6 +13,7 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.data.AppCatalog
 import com.catfee.yingling.data.AppEntry
+import com.catfee.yingling.data.HistoryStore
 import com.catfee.yingling.engine.CloudClient
 import com.catfee.yingling.engine.CloudLlmConfig
 import com.catfee.yingling.engine.ModelCatalog
@@ -85,6 +86,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     val downloadState = ModelDownloader.state
+    val historySessions = HistoryStore.sessions
 
     val status = AppState.status
     val direction = AppState.direction
@@ -97,6 +99,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val lastError = AppState.lastError
 
     init {
+        HistoryStore.ensureLoaded(context)
         loadProviders()
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) { AppCatalog.load(context) }
@@ -428,5 +431,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearError() {
         AppState.clearError()
+    }
+
+    fun clearHistory() {
+        HistoryStore.clear()
     }
 }

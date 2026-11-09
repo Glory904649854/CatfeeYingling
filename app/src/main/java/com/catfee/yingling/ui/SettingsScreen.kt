@@ -32,7 +32,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,6 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
@@ -62,6 +67,7 @@ import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
 import com.catfee.yingling.ui.theme.TextTertiary
+import com.catfee.yingling.util.SourceAppResolver
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -71,6 +77,18 @@ fun SettingsScreen(vm: MainViewModel) {
     val overlayVisible by vm.overlayVisible.collectAsStateWithLifecycle()
     val active = status == SessionStatus.RUNNING || status == SessionStatus.PAUSED
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var permissionTick by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val usageAccessGranted = remember(permissionTick) {
+        SourceAppResolver.usageAccessGranted(context)
+    }
 
     fun planned() {
         Toast.makeText(
@@ -411,6 +429,47 @@ fun SettingsScreen(vm: MainViewModel) {
                         uncheckedThumbColor = TextTertiary,
                         uncheckedTrackColor = SurfaceHigh,
                     ),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        SectionCard {
+            SectionTitle("来源 App 识别")
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = if (usageAccessGranted) {
+                            "已授权，历史记录会记录具体 App"
+                        } else {
+                            "未授权，历史记录只能记录监听范围"
+                        },
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "仅用于识别当前播放音频的应用，不会上传。绑定单个应用时无需此权限。",
+                        color = TextTertiary,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp,
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = if (usageAccessGranted) "已开启" else "去授权",
+                    color = Cyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable {
+                        if (!usageAccessGranted) {
+                            runCatching {
+                                context.startActivity(SourceAppResolver.usageAccessSettingsIntent())
+                            }
+                        }
+                    },
                 )
             }
         }

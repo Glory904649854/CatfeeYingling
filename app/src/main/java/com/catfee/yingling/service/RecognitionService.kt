@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -29,6 +30,7 @@ import com.catfee.yingling.core.Languages
 import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.core.SubtitleLine
+import com.catfee.yingling.data.HistoryStore
 import com.catfee.yingling.engine.CloudLlmConfig
 import com.catfee.yingling.engine.DemoRecognitionEngine
 import com.catfee.yingling.engine.ModelStore
@@ -37,6 +39,8 @@ import com.catfee.yingling.engine.SherpaStreamingEngine
 import com.catfee.yingling.engine.RecognitionEngine
 import com.catfee.yingling.engine.RecognitionResult
 import com.catfee.yingling.engine.Translator
+import com.catfee.yingling.util.SourceApp
+import com.catfee.yingling.util.SourceAppResolver
 
 /**
  * 监听会话服务：
@@ -58,6 +62,7 @@ class RecognitionService : Service() {
 
     private var running = false
     private var paused = false
+    private var historySessionId: String? = null
 
     private val overlayCallbacks = object : OverlayController.Callbacks {
         override fun onTogglePause() {
@@ -118,6 +123,8 @@ class RecognitionService : Service() {
                 }
                 mediaProjection = projection
                 registerProjectionCallback(projection)
+                endHistorySession()
+                beginHistorySession()
                 engine = buildEngine().also { it.start() }
                 AppState.status.value = SessionStatus.STARTING
 
@@ -175,6 +182,7 @@ class RecognitionService : Service() {
         mediaProjection = projection
         registerProjectionCallback(projection)
 
+        beginHistorySession()
         engine = buildEngine().also { it.start() }
         AppState.engineName.value = engine?.name ?: "Demo 引擎"
         ensureOverlay()
@@ -257,6 +265,17 @@ class RecognitionService : Service() {
             AppState.liveSource.value = ""
             AppState.sourceText.value = result.sourceText
             AppState.translatedText.value = result.translatedText
+
+            val sessionId = historySessionId ?: beginHistorySession()
+            val app = currentSourceApp()
+            HistoryStore.addEntry(
+                sessionId = sessionId,
+                source = result.sourceText,
+                translated = result.translatedText,
+                timestamp = System.currentTimeMillis(),
+                appPackage = app.packageName,
+                appName = app.label,
+            )
         } else if (result.sourceText.isNotBlank()) {
             AppState.liveSource.value = result.sourceText
             AppState.sourceText.value = result.sourceText
@@ -265,6 +284,41 @@ class RecognitionService : Service() {
             overlay?.setTranscript(AppState.history.value, AppState.liveSource.value)
         }
     }
+
+    private fun beginHistorySession(): String {
+        HistoryStore.ensureLoaded(this)
+        val app = knownSourceApp()
+        return HistoryStore.beginSession(
+            context = this,
+            sourceLang = prefs.sourceLang,
+            targetLang = prefs.targetLang,
+            appPackage = app?.packageName.orEmpty(),
+            appName = app?.label.orEmpty(),
+        ).also {
+            historySessionId = it
+        }
+    }
+
+    private fun endHistorySession() {
+        val sessionId = historySessionId ?: return
+        HistoryStore.endSession(sessionId, System.currentTimeMillis())
+        historySessionId = null
+    }
+
+    private fun knownSourceApp(): SourceApp? {
+        SourceAppResolver.resolve(this, resolveUids())?.let { return it }
+        if (prefs.mode == Prefs.MODE_APPS) {
+            val packages = prefs.selectedPackages
+            if (packages.size == 1) {
+                val pkg = packages.first()
+                return SourceApp(pkg, SourceAppResolver.labelFor(this, pkg))
+            }
+        }
+        return null
+    }
+
+    private fun currentSourceApp(): SourceApp =
+        knownSourceApp() ?: SourceApp("", scopeLabel())
 
     private fun setPaused(value: Boolean) {
         if (!running || paused == value) return
@@ -295,6 +349,7 @@ class RecognitionService : Service() {
     private fun stopSession() {
         running = false
         paused = false
+        endHistorySession()
         capture?.stop()
         capture = null
         engine?.stop()
@@ -322,9 +377,11 @@ class RecognitionService : Service() {
         refreshScopeLabel()
         overlay?.setDirection(AppState.direction.value)
 
+        endHistorySession()
         engine?.stop()
         engine = buildEngine().also { it.start() }
         AppState.engineName.value = engine?.name ?: "Demo 引擎"
+        beginHistorySession()
         if (paused) engine?.pause()
 
         if (!paused) {
@@ -531,6 +588,7 @@ class RecognitionService : Service() {
         super.onDestroy()
         running = false
         paused = false
+        endHistorySession()
         capture?.stop()
         capture = null
         engine?.stop()
