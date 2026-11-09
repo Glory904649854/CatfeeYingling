@@ -57,8 +57,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var cloudModel by mutableStateOf("")
         private set
-    var cloudExtraJson by mutableStateOf("")
-        private set
     var modelOptions by mutableStateOf<List<String>>(emptyList())
         private set
     var modelListLoading by mutableStateOf(false)
@@ -253,11 +251,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         clearCloudProbe()
     }
 
-    fun updateCloudExtraJson(value: String) {
-        cloudExtraJson = value
-        clearCloudProbe()
-    }
-
     fun fetchModels() {
         saveDraft()
         val config = draftConfig(requireModel = false)
@@ -332,7 +325,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             baseUrl = base,
             apiKey = key,
             model = model,
-            extraJson = cloudExtraJson.trim(),
         )
     }
 
@@ -397,7 +389,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         cloudBaseUrl = provider.baseUrl
         cloudApiKey = provider.apiKey
         cloudModel = provider.model
-        cloudExtraJson = provider.extraJson
         if (persist) prefs.activeProviderId = provider.id
     }
 
@@ -410,7 +401,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     baseUrl = cloudBaseUrl.trim(),
                     apiKey = cloudApiKey.trim(),
                     model = cloudModel.trim(),
-                    extraJson = cloudExtraJson.trim(),
                 )
             } else {
                 provider

@@ -237,13 +237,6 @@ fun SettingsScreen(vm: MainViewModel) {
                 placeholder = "deepseek-chat",
             )
             Spacer(Modifier.height(8.dp))
-            CloudField(
-                label = "额外参数（JSON，可选）",
-                value = vm.cloudExtraJson,
-                onValueChange = vm::updateCloudExtraJson,
-                placeholder = "{\"enable_thinking\": false}",
-            )
-            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GhostAction(
                     text = if (vm.modelListLoading) "拉取中…" else "拉取模型",
@@ -296,7 +289,7 @@ fun SettingsScreen(vm: MainViewModel) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "DeepSeek chat 本身不思考；Qwen3 等可填 {\"enable_thinking\": false} 关闭思考。不同供应商参数不同，留空即可。",
+                text = "自定义供应商会自动关闭思考（reasoning_effort=none）；DeepSeek 官方 chat/flash 本身不思考。",
                 color = TextTertiary,
                 fontSize = 10.sp,
                 lineHeight = 15.sp,

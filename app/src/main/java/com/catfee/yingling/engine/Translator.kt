@@ -11,7 +11,6 @@ data class CloudLlmConfig(
     val baseUrl: String,
     val apiKey: String,
     val model: String,
-    val extraJson: String = "",
 )
 
 /**
@@ -83,8 +82,6 @@ class Translator(
 
 /** OpenAI 兼容的 chat/completions 调用。 */
 object CloudClient {
-
-    private val CORE_KEYS = setOf("model", "messages", "stream", "temperature", "max_tokens")
 
     data class TestResult(
         val ok: Boolean,
@@ -177,21 +174,14 @@ object CloudClient {
         }
 
         return JSONObject().apply {
-            // 供应商自定义参数（如 enable_thinking / reasoning_effort）先放，
-            // 下面再用核心字段覆盖，避免把 model/messages 写坏。
-            if (config.extraJson.isNotBlank()) {
-                runCatching { JSONObject(config.extraJson) }.getOrNull()?.let { extra ->
-                    val keys = extra.keys()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        if (key !in CORE_KEYS) put(key, extra.get(key))
-                    }
-                }
-            }
             put("model", config.model)
             put("temperature", 0)
             put("max_tokens", maxTokens)
             put("stream", false)
+            // 自定义供应商统一关闭思考；DeepSeek 官方 chat/flash 本身不思考，不额外传参。
+            if (!baseUrl(config).contains("api.deepseek.com")) {
+                put("reasoning_effort", "none")
+            }
             put("messages", JSONArray().apply {
                 if (system != null) {
                     put(JSONObject().put("role", "system").put("content", system))
@@ -223,13 +213,19 @@ object CloudClient {
         }
     }
 
-    private fun extractContent(body: String): String =
-        JSONObject(body)
+    private fun extractContent(body: String): String {
+        val raw = JSONObject(body)
             .optJSONArray("choices")
             ?.optJSONObject(0)
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
+        // 部分模型在关闭思考后仍会在正文开头带 </think> 或思考标记，统一清掉。
+        return raw
+            .replace(Regex("(?is)<\\|?think\\|?>.*?<\\|?/think\\|?>"), "")
+            .replace(Regex("(?i)</?think>"), "")
+            .trim()
+    }
 
     private fun baseUrl(config: CloudLlmConfig): String {
         val base = config.baseUrl.trim().trimEnd('/')

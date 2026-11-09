@@ -198,7 +198,6 @@ class RecognitionService : Service() {
                 baseUrl = provider.baseUrl,
                 apiKey = provider.apiKey,
                 model = provider.model,
-                extraJson = provider.extraJson,
             )
         } else {
             null

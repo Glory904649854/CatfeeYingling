@@ -94,7 +94,6 @@ class Prefs(context: Context) {
                                 baseUrl = item.optString("baseUrl"),
                                 apiKey = item.optString("apiKey"),
                                 model = item.optString("model"),
-                                extraJson = item.optString("extraJson"),
                             ),
                         )
                     }
@@ -124,7 +123,6 @@ class Prefs(context: Context) {
                     put("baseUrl", provider.baseUrl)
                     put("apiKey", provider.apiKey)
                     put("model", provider.model)
-                    put("extraJson", provider.extraJson)
                 },
             )
         }
