@@ -2,36 +2,27 @@ package com.catfee.yingling.service
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.os.SystemClock
 import android.provider.Settings
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.core.label
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /**
- * 悬浮窗：声浪、状态、翻译方向、暂停/继续、停止。
- *
- * 用原生 View 而不是 ComposeView，避免在 Service 里额外搭 LifecycleOwner，
- * 也方便直接挂到 WindowManager 上。
+ * 紧凑悬浮窗：只保留“中文原文 + 英文译文 + 状态/方向/控制”，
+ * 去掉声浪，尽量少占屏幕，同时保证原文和译文可以完整阅读（超长可滚动）。
  */
 class OverlayController(
     private val context: Context,
@@ -49,14 +40,14 @@ class OverlayController(
     private var root: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
     private var body: LinearLayout? = null
-    private var wave: WaveformView? = null
+    private var scroll: MaxScrollView? = null
     private var dot: View? = null
     private var statusView: TextView? = null
     private var directionView: TextView? = null
     private var sourceView: TextView? = null
     private var targetView: TextView? = null
     private var pauseView: TextView? = null
-    private var metaView: TextView? = null
+    private var scopeView: TextView? = null
 
     private var pausedVisual = false
     private var collapsed = false
@@ -74,7 +65,7 @@ class OverlayController(
         }
 
         val dm = context.resources.displayMetrics
-        val width = min((dm.widthPixels * 0.94f).toInt(), dp(372))
+        val width = min((dm.widthPixels * 0.92f).toInt(), dp(360))
         val lp = WindowManager.LayoutParams(
             width,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -85,7 +76,7 @@ class OverlayController(
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = dm.widthPixels - width - dp(8)
-            y = dp(90)
+            y = dp(80)
         }
 
         val view = buildViews(direction, scopeLabel)
@@ -106,13 +97,10 @@ class OverlayController(
         runCatching { wm.removeView(view) }
     }
 
-    fun setLevel(level: Float) {
-        wave?.push(level)
-    }
-
     fun setText(source: String, target: String) {
         sourceView?.text = source.ifBlank { "—" }
         targetView?.text = target.ifBlank { "等待语音…" }
+        scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
     }
 
     fun setDirection(direction: String) {
@@ -120,7 +108,7 @@ class OverlayController(
     }
 
     fun setScope(scopeLabel: String) {
-        metaView?.text = scopeLabel
+        scopeView?.text = scopeLabel
     }
 
     fun setStatus(status: SessionStatus) {
@@ -140,11 +128,9 @@ class OverlayController(
 
     fun setPaused(paused: Boolean) {
         pausedVisual = paused
-        wave?.pausedVisual = paused
         dot?.background = circle(if (paused) Colors.paused else Colors.mint)
         statusView?.text = if (paused) "已暂停" else "运行中"
         pauseView?.text = if (paused) "继续" else "暂停"
-        if (paused) wave?.push(0f)
     }
 
     // ---------------------------------------------------------------- views
@@ -152,9 +138,9 @@ class OverlayController(
     private fun buildViews(direction: String, scopeLabel: String): LinearLayout {
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setPadding(dp(14), dp(11), dp(14), dp(11))
             background = GradientDrawable().apply {
-                cornerRadius = dp(22).toFloat()
+                cornerRadius = dp(18).toFloat()
                 setColor(Colors.bg)
                 setStroke(dp(1), Colors.border)
             }
@@ -165,51 +151,52 @@ class OverlayController(
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val statusDot = View(context).apply {
-            background = circle(Colors.mint)
-        }
-        header.addView(statusDot, LinearLayout.LayoutParams(dp(8), dp(8)))
+        val statusDot = View(context).apply { background = circle(Colors.mint) }
+        header.addView(statusDot, LinearLayout.LayoutParams(dp(7), dp(7)))
         dot = statusDot
 
-        val titles = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val title = TextView(context).apply {
             text = "应灵"
             setTextColor(Colors.text)
-            textSize = 14f
+            textSize = 12.5f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
+        header.addView(title, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(6) })
+
         val status = TextView(context).apply {
             text = "运行中"
             setTextColor(Colors.muted)
-            textSize = 10f
-            setPadding(0, dp(1), 0, 0)
+            textSize = 9f
         }
-        titles.addView(title)
-        titles.addView(status)
-        header.addView(
-            titles,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                leftMargin = dp(9)
-            },
-        )
+        header.addView(status, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(6) })
         statusView = status
 
-        val directionText = TextView(context).apply {
+        val dir = TextView(context).apply {
             text = direction
             setTextColor(Colors.mint)
-            textSize = 10f
+            textSize = 9f
             gravity = Gravity.CENTER
-            setPadding(dp(9), dp(4), dp(9), dp(4))
+            setPadding(dp(7), dp(3), dp(7), dp(3))
             background = rounded(Colors.chipBg, 99)
         }
-        header.addView(directionText)
-        directionView = directionText
+        header.addView(dir, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) })
+        directionView = dir
+
+        header.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+
+        val scope = TextView(context).apply {
+            text = scopeLabel
+            setTextColor(Colors.muted)
+            textSize = 8.5f
+        }
+        header.addView(scope, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) })
+        scopeView = scope
 
         val collapse = TextView(context).apply {
             text = "收起"
             setTextColor(Colors.muted)
-            textSize = 10f
-            setPadding(dp(10), dp(4), dp(6), dp(4))
+            textSize = 9f
+            setPadding(dp(6), dp(2), dp(6), dp(2))
             isClickable = true
         }
         header.addView(collapse)
@@ -217,31 +204,19 @@ class OverlayController(
         val close = TextView(context).apply {
             text = "×"
             setTextColor(Colors.muted)
-            textSize = 17f
+            textSize = 15f
             gravity = Gravity.CENTER
-            setPadding(dp(6), 0, 0, dp(2))
+            setPadding(dp(4), 0, 0, dp(1))
             isClickable = true
             setOnClickListener { callbacks.onHide() }
         }
         header.addView(close)
 
-        container.addView(
-            header,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+        container.addView(header, LinearLayout.LayoutParams(MATCH, WRAP))
         installDrag(header)
 
         val bodyView = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        container.addView(
-            bodyView,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+        container.addView(bodyView, LinearLayout.LayoutParams(MATCH, WRAP))
         body = bodyView
         bodyView.visibility = if (collapsed) View.GONE else View.VISIBLE
 
@@ -251,39 +226,32 @@ class OverlayController(
             collapse.text = if (collapsed) "展开" else "收起"
         }
 
-        val waveform = WaveformView(context)
-        bodyView.addView(
-            waveform,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(46),
-            ).apply { topMargin = dp(10) },
-        )
-        wave = waveform
+        val maxHeight = min((context.resources.displayMetrics.heightPixels * 0.50f).toInt(), dp(320))
+        val scroller = MaxScrollView(context, maxHeight)
+        bodyView.addView(scroller, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) })
+        scroll = scroller
+
+        val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        scroller.addView(content, LinearLayout.LayoutParams(MATCH, WRAP))
 
         val source = TextView(context).apply {
             text = "—"
             setTextColor(Colors.muted)
             textSize = 11f
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            setLineSpacing(0f, 1.1f)
-            setPadding(0, dp(8), 0, 0)
+            setLineSpacing(0f, 1.15f)
+            setPadding(0, 0, 0, dp(3))
         }
-        bodyView.addView(source)
+        content.addView(source, LinearLayout.LayoutParams(MATCH, WRAP))
         sourceView = source
 
         val target = TextView(context).apply {
             text = "等待语音…"
             setTextColor(Colors.text)
-            textSize = 17f
-            maxLines = 3
-            ellipsize = TextUtils.TruncateAt.END
-            setLineSpacing(0f, 1.12f)
-            setPadding(0, dp(4), 0, 0)
+            textSize = 16.5f
+            setLineSpacing(0f, 1.15f)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
-        bodyView.addView(target)
+        content.addView(target, LinearLayout.LayoutParams(MATCH, WRAP))
         targetView = target
 
         val controls = LinearLayout(context).apply {
@@ -292,19 +260,15 @@ class OverlayController(
         }
         bodyView.addView(
             controls,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
+            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(9) },
         )
 
         val pause = TextView(context).apply {
             text = "暂停"
             setTextColor(Color.rgb(7, 18, 15))
-            textSize = 12f
+            textSize = 11f
             gravity = Gravity.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setPadding(dp(18), dp(8), dp(18), dp(8))
+            setPadding(dp(14), dp(6), dp(14), dp(6))
             background = rounded(Colors.mint, 99)
             isClickable = true
             setOnClickListener { callbacks.onTogglePause() }
@@ -315,30 +279,14 @@ class OverlayController(
         val stop = TextView(context).apply {
             text = "停止"
             setTextColor(Colors.danger)
-            textSize = 12f
+            textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(dp(18), dp(8), dp(18), dp(8))
+            setPadding(dp(14), dp(6), dp(14), dp(6))
             background = rounded(Colors.dangerBg, 99)
             isClickable = true
             setOnClickListener { callbacks.onStop() }
         }
-        controls.addView(
-            stop,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { leftMargin = dp(8) },
-        )
-
-        controls.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-
-        val meta = TextView(context).apply {
-            text = scopeLabel
-            setTextColor(Colors.muted)
-            textSize = 9.5f
-        }
-        controls.addView(meta)
-        metaView = meta
+        controls.addView(stop, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(7) })
 
         return container
     }
@@ -368,9 +316,7 @@ class OverlayController(
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
-                    if (!dragging && (abs(dx) > slop || abs(dy) > slop)) {
-                        dragging = true
-                    }
+                    if (!dragging && (abs(dx) > slop || abs(dy) > slop)) dragging = true
                     if (dragging) {
                         lp.x = (startX + dx).toInt()
                         lp.y = (startY + dy).toInt().coerceAtLeast(0)
@@ -426,76 +372,17 @@ class OverlayController(
             setColor(color)
         }
 
-    // ------------------------------------------------------------ waveform
-
-    private class WaveformView(context: Context) : View(context) {
-
-        private val levels = FloatArray(44)
-        private var head = 0
-        private var smooth = 0f
-        private var shader: LinearGradient? = null
-        private var grayShader: LinearGradient? = null
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        var pausedVisual = false
-
-        fun push(level: Float) {
-            val target = if (pausedVisual) 0f else level.coerceIn(0f, 1f)
-            smooth += (target - smooth) * if (target > smooth) 0.6f else 0.14f
-            levels[head] = smooth
-            head = (head + 1) % levels.size
-            invalidate()
-        }
-
-        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-            super.onSizeChanged(w, h, oldw, oldh)
-            shader = LinearGradient(
-                0f, 0f, w.toFloat(), 0f,
-                intArrayOf(Colors.mint, Colors.blue), null,
-                Shader.TileMode.CLAMP,
-            )
-            grayShader = LinearGradient(
-                0f, 0f, w.toFloat(), 0f,
-                intArrayOf(Color.rgb(70, 82, 92), Color.rgb(44, 53, 61)), null,
-                Shader.TileMode.CLAMP,
-            )
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            if (w <= 0f || h <= 0f) return
-
-            val n = levels.size
-            val slot = w / n
-            val barWidth = max(slot * 0.5f, 1.5f)
-            paint.shader = if (pausedVisual) grayShader else shader
-            val idle = !pausedVisual && smooth < 0.02f
-            val phase = SystemClock.elapsedRealtime() / 1000f * 1.6f
-
-            for (i in 0 until n) {
-                val levelValue = levels[(head + i) % n]
-                val value = when {
-                    pausedVisual -> 0.02f + 0.01f * (0.5f + 0.5f * sin(i * 0.6f))
-                    idle -> 0.05f + 0.04f * (0.5f + 0.5f * sin(i * 0.6f + phase))
-                    else -> levelValue
-                }
-                val minHeight = barWidth * 0.85f
-                val barHeight = max(minHeight, value * (h - minHeight))
-                val left = i * slot + (slot - barWidth) / 2f
-                val top = (h - barHeight) / 2f
-                canvas.drawRoundRect(
-                    left, top, left + barWidth, top + barHeight,
-                    barWidth / 2f, barWidth / 2f, paint,
-                )
-            }
+    /** 限制最大高度的滚动容器：长句可以完整读，窗口不会盖满屏幕。 */
+    private class MaxScrollView(context: Context, private val maxHeightPx: Int) : ScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val spec = MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST)
+            super.onMeasure(widthMeasureSpec, spec)
         }
     }
 
     private object Colors {
-        val bg: Int = Color.argb(243, 15, 20, 25)
-        val border: Int = Color.argb(34, 255, 255, 255)
+        val bg: Int = Color.argb(246, 15, 20, 25)
+        val border: Int = Color.argb(30, 255, 255, 255)
         val text: Int = Color.rgb(238, 244, 247)
         val muted: Int = Color.rgb(138, 151, 162)
         val mint: Int = Color.rgb(91, 231, 196)
@@ -504,5 +391,10 @@ class OverlayController(
         val dangerBg: Int = Color.argb(26, 255, 107, 107)
         val paused: Int = Color.rgb(255, 184, 107)
         val chipBg: Int = Color.argb(26, 91, 231, 196)
+    }
+
+    private companion object {
+        const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
+        const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
     }
 }

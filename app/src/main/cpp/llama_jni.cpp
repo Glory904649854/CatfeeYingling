@@ -138,7 +138,8 @@ Java_com_catfee_yingling_engine_QwenBridge_nativeTranslate(
 
     const std::string prompt =
         "<|im_start|>system\n"
-        "Translate the Chinese subtitle into concise English. Output only the translation.<|im_end|>\n"
+        "Translate the Chinese subtitle into concise English. "
+        "Output only the translation, no Chinese, no quotes.<|im_end|>\n"
         "<|im_start|>user\n" + input + "<|im_end|>\n"
         "<|im_start|>assistant\n";
 

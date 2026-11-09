@@ -177,7 +177,26 @@ class SherpaStreamingEngine(
             "",
         )
         text = text.replace(Regex("(?i)^translation[:：]\\s*"), "")
-        return text.trim().trim('"', '\'', '“', '”', '\n', ' ')
+        text = text.replace(Regex("(?i)^english[:：]\\s*"), "")
+        text = text.trim().trim('"', '\'', '“', '”', '\n', ' ')
+
+        // 模型偶尔会把中文原样吐回来；这种情况宁可保留上一条英文，也不显示中文
+        if (text.isNotEmpty() && cjkRatio(text) > 0.2f) {
+            Log.w(TAG, "drop Chinese output: $text")
+            return ""
+        }
+        return text
+    }
+
+    private fun cjkRatio(text: String): Float {
+        var total = 0
+        var cjk = 0
+        for (ch in text) {
+            if (ch.isWhitespace() || ch in ".,!?;:'\"-—()[]{}") continue
+            total++
+            if (ch.code in 0x3400..0x4DBF || ch.code in 0x4E00..0x9FFF) cjk++
+        }
+        return if (total == 0) 0f else cjk.toFloat() / total
     }
 
     override fun pause() {
@@ -214,6 +233,6 @@ class SherpaStreamingEngine(
     private companion object {
         const val TAG = "YingLingSherpa"
         const val PARTIAL_INTERVAL_MS = 250L
-        const val MAX_SEGMENT_MS = 4_000L
+        const val MAX_SEGMENT_MS = 3_000L
     }
 }

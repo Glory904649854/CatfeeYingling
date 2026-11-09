@@ -332,7 +332,6 @@ class RecognitionService : Service() {
             uids = uids,
             onLevel = { level ->
                 AppState.level.value = level
-                main.post { overlay?.setLevel(level) }
             },
             onPcm16k = { pcm, level ->
                 if (!paused) engine?.onAudio(pcm, level)

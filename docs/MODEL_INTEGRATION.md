@@ -58,8 +58,9 @@ stream.acceptWaveform(samples, 16_000)
 ### 1.4 断句策略
 
 - 正常端点：`recognizer.isEndpoint(stream)`
-- 课程/讲座长时间不停顿：`MAX_SEGMENT_MS = 4_000` 强制断句
+- 课程/讲座长时间不停顿：`MAX_SEGMENT_MS = 3_000` 强制断句
 - partial 每 250ms 更新一次悬浮窗
+- 译文如果仍包含中文（模型偶尔复述原文），`cleanTranslation()` 会丢弃，保留上一条英文
 
 调大 `MAX_SEGMENT_MS`：译文更长、更连贯，但延迟增加；调小：字幕更频繁，但句子更碎。
 
@@ -78,7 +79,7 @@ stream.acceptWaveform(samples, 16_000)
 `cpp/llama_jni.cpp`：
 
 - `n_ctx = 512`、`n_batch = 256`
-- `n_threads = 6`（设备 8 核：2 大 + 6 小）
+- `n_threads = 6`（设备 8 核：2 大 + 6 小；8 线程实测更慢）
 - 贪心采样，最多 64 token
 - 每次翻译前清空 KV cache，保证不同句子互不影响
 - 编译启用 `-O3` 与 `-march=armv8.2-a+dotprod+fp16`
@@ -99,10 +100,10 @@ Translate the Chinese subtitle into concise English. Output only the translation
 
 | 中文长度 | 耗时 |
 |---|---|
-| 13 字 | 1.5s |
-| 20~24 字 | 1.3~2.4s |
-| 28~33 字 | 2.3~4.1s |
-| 37 字 | 2.4~4.7s |
+| 9 字 | 2.6s |
+| 13~19 字 | 1.5~1.8s |
+| 20~24 字 | 2~3s |
+| 28~37 字 | 2.3~4.1s |
 
 想更快：
 1. 缩短 `MAX_SEGMENT_MS` 到 3 秒（句子更短，输出更少）；

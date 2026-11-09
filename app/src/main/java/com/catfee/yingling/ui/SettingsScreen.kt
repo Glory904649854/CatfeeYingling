@@ -96,7 +96,7 @@ fun SettingsScreen(vm: MainViewModel) {
             EngineRow(
                 title = "Sherpa + Qwen（流式中 → 英）",
                 subtitle = if (vm.fastReady) {
-                    "流式识别 + 逐句翻译 · 约 2~4 秒"
+                    "流式识别 + 逐句翻译 · 约 1.5~3 秒"
                 } else {
                     "未找到 models/sherpa-zh-en 或 Qwen gguf"
                 },
