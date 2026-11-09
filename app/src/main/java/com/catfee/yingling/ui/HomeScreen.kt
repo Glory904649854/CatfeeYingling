@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +71,7 @@ import com.catfee.yingling.ui.theme.Blue
 import com.catfee.yingling.ui.theme.BorderDark
 import com.catfee.yingling.ui.theme.Danger
 import com.catfee.yingling.ui.theme.Cyan
+import com.catfee.yingling.ui.theme.IceCyan
 import com.catfee.yingling.ui.theme.SurfaceHigh
 import com.catfee.yingling.ui.theme.TextPrimary
 import com.catfee.yingling.ui.theme.TextSecondary
@@ -245,19 +247,30 @@ private fun Header(status: SessionStatus) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "应灵",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = TextPrimary,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        brush = Brush.horizontalGradient(listOf(IceCyan, Cyan, Blue)),
+                    ),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(9.dp))
                 MiniTag("BETA")
             }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = "YINGLING · ON-DEVICE LIVE CAPTION",
-                color = TextTertiary,
-                fontSize = 8.5f.sp,
-                letterSpacing = 1.3f.sp,
-            )
+            Spacer(Modifier.height(5.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .width(18.dp)
+                        .height(1.5.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Brush.horizontalGradient(listOf(Cyan, Blue))),
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = "YINGLING · ON-DEVICE LIVE CAPTION",
+                    color = TextTertiary,
+                    fontSize = 8.5f.sp,
+                    letterSpacing = 1.6f.sp,
+                )
+            }
         }
         StatusBadge(status)
     }

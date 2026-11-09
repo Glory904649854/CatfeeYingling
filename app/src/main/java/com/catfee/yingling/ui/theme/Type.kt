@@ -2,24 +2,29 @@ package com.catfee.yingling.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.catfee.yingling.R
+
+// 站酷小薇（SIL OFL 1.1），仅打包标题所需字形
+private val DisplayFont = FontFamily(Font(R.font.zcool_xiaowei))
 
 val YingLingTypography = Typography(
     displaySmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 30.sp,
-        lineHeight = 36.sp,
-        letterSpacing = (-0.8f).sp,
+        fontFamily = DisplayFont,
+        fontWeight = FontWeight.Normal,
+        fontSize = 34.sp,
+        lineHeight = 42.sp,
+        letterSpacing = 2.sp,
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = (-0.3f).sp,
+        fontFamily = DisplayFont,
+        fontWeight = FontWeight.Normal,
+        fontSize = 25.sp,
+        lineHeight = 32.sp,
+        letterSpacing = 2.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,

@@ -127,4 +127,5 @@ scripts/fetch-llama.ps1
 - sherpa-onnx：Apache-2.0
 - llama.cpp：MIT
 - Qwen2.5：Apache-2.0
+- ZCOOL XiaoWei（标题字体）：SIL OFL 1.1，仅打包标题所需字形，许可见 `docs/fonts/OFL-ZCOOL-XiaoWei.txt`
 - whisper.cpp / Whisper：MIT（代码已移除，仅历史提交保留）
