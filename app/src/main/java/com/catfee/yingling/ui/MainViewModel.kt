@@ -55,8 +55,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             loading = false
         }
         viewModelScope.launch {
+            refreshReady()
+        }
+    }
+
+    private fun refreshReady() {
+        val source = sourceLang
+        val target = targetLang
+        viewModelScope.launch {
             fastReady = withContext(Dispatchers.IO) {
-                ModelStore.findSherpaModel(context) != null && ModelStore.findQwenModel(context) != null
+                if (ModelStore.findQwenModel(context) == null) return@withContext false
+                if (target == "en") {
+                    ModelStore.findSherpaModel(context) != null
+                } else {
+                    when (source) {
+                        "ja", "ko", "en" -> ModelStore.findSenseVoiceModel(context) != null
+                        "fr", "ru" -> false
+                        else -> ModelStore.findSherpaModel(context) != null
+                    }
+                }
             }
         }
     }
@@ -96,6 +113,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         sourceLang = code
         prefs.sourceLang = code
         AppState.direction.value = Languages.direction(code, targetLang)
+        refreshReady()
         if (isSessionActive()) RecognitionService.refresh(context)
     }
 
@@ -104,6 +122,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         targetLang = code
         prefs.targetLang = code
         AppState.direction.value = Languages.direction(sourceLang, code)
+        refreshReady()
         if (isSessionActive()) RecognitionService.refresh(context)
     }
 

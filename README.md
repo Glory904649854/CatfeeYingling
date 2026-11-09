@@ -10,8 +10,8 @@
 - **系统音频采集**：`AudioPlaybackCapture` + 一次 `MediaProjection` 授权（仅取音频，不录屏）。
 - **按应用监听**：多选应用，按 UID 精确捕获；也可切到「全部媒体」按类型捕获。
 - **悬浮字幕窗**：紧凑布局，只保留状态/方向 + 中文原文 + 英文译文 + 暂停/停止；去掉声浪区，长句可滚动完整阅读。
-- **流式 ASR**：sherpa-onnx 中英双语 zipformer，边说话边出中文 partial（约 250ms）。
-- **逐句翻译**：Qwen2.5-0.5B-Instruct（llama.cpp），每 4 秒强制断句后翻译。
+- **流式 ASR**：中文/英文用 sherpa-onnx 流式 zipformer；日/韩/英用 SenseVoice 离线多语种识别。
+- **逐句翻译**：Qwen2.5-0.5B-Instruct（llama.cpp），支持目标中文或英文；日/韩/英 → 中、中 → 英。
 - **AI Studio 风格本体**：深色扁平、22dp 圆角、薄荷绿→天蓝渐变、三页导航。
 
 ## 2. 架构
@@ -19,9 +19,10 @@
 ```
 AudioPlaybackCapture (48k stereo)
   → 16k mono
-  → sherpa-onnx Streaming Zipformer（中文 partial）
+  → 中文/英文：sherpa-onnx Streaming Zipformer
+  → 日/韩/英 → 中文：sherpa-onnx SenseVoice（能量 VAD 切段）
   → 端点检测 / 3 秒强制断句
-  → Qwen2.5-0.5B-Instruct（llama.cpp，中 → 英，过滤中文输出）
+  → Qwen2.5-0.5B-Instruct（llama.cpp，目标中文或英文）
   → 悬浮字幕（原文 + 译文完整显示）
 ```
 
@@ -49,32 +50,41 @@ gradlew.bat assembleDebug
 | 模型 | 大小 | 放置路径 |
 |---|---|---|
 | sherpa zipformer 中英双语 | encoder 330MB + decoder 14MB + joiner 13MB + tokens | `models/sherpa-zh-en/` |
+| SenseVoice 多语种（中英日韩粤） | 239MB + tokens | `models/sensevoice/` |
 | Qwen2.5-0.5B-Instruct Q4_K_M | 约 491MB | `models/qwen2.5-0.5b-instruct-q4_k_m.gguf` |
 
 ```bash
 adb shell mkdir -p /sdcard/Android/data/com.catfee.yingling/files/models/sherpa-zh-en
 adb push sherpa-zh-en/. /sdcard/Android/data/com.catfee.yingling/files/models/sherpa-zh-en/
+
+adb shell mkdir -p /sdcard/Android/data/com.catfee.yingling/files/models/sensevoice
+adb push sensevoice/. /sdcard/Android/data/com.catfee.yingling/files/models/sensevoice/
+
 adb push qwen2.5-0.5b-instruct-q4_k_m.gguf /sdcard/Android/data/com.catfee.yingling/files/models/
 ```
 
 模型来源：
-- sherpa：<https://hf-mirror.com/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20>
+- sherpa zipformer：<https://hf-mirror.com/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20>
+- SenseVoice：<https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17>
 - Qwen：<https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct-GGUF>
 
 ## 5. 实测（Redmi Note 9 / Android 12 / 天玑 800U）
 
 - 中文 partial：约 250ms 更新一次，识别准确率明显优于 Vosk 小模型。
-- 翻译：15~19 个中文字符 → **1.5~1.8 秒**；20~30 字约 2~3 秒。
-- 字幕节奏：每 3 秒断句一次，英文延迟约 **1.5~3 秒**；从开口算约 4~6 秒。
+- 日 → 中：SenseVoice 识别日语（6.1s 音频）→ Qwen 中文，翻译约 1.7s。
+- 英 → 中：SenseVoice 识别英语（6.4s 音频）→ Qwen 中文，翻译约 1.6s。
+- 中 → 英：流式 zipformer + Qwen，15~19 字约 1.5~1.8s。
+- 字幕节奏：每 3 秒断句一次，译文延迟约 **1.5~3 秒**；从开口算约 4~6 秒。
 - 悬浮窗：已去掉声浪，默认高度约为原来的 60%，长句可滚动完整查看。
-- 内存：约 1.2GB（ASR 330MB + Qwen 491MB + 运行时）。
+- 内存：约 1.2GB（ASR 330MB / SenseVoice 239MB + Qwen 491MB + 运行时）。
 
 > 翻译质量说明：0.5B 模型能读懂，但偏生硬，专有名词容易出错。
 > 追求质量换 Qwen2.5-1.5B（更慢）、或接云端翻译。Q4_0 量化版在本机实测反而更慢/更容易跑偏，默认仍用 Q4_K_M。
 
 ## 6. 已知限制
 
-- 当前只做 **中 → 英**；目标语言固定英语，源语言建议锁定中文。
+- 当前端到端支持：**中 → 英、英 → 中、日 → 中、韩 → 中**；法/俄语音识别暂未接入。
+- 日/韩译文质量受 0.5B 模型限制，偏生硬；追求质量需换 Qwen2.5-1.5B 或云端。
 - 模型文件需手动放置，未内置下载器。
 - 长时间运行会发热、耗电；中端机建议插电使用。
 - 被采集应用设置 `allowAudioPlaybackCapture=false`、使用 DRM 或通话音频时无法采集。

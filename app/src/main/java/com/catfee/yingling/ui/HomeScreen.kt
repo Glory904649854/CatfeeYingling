@@ -416,8 +416,12 @@ private fun DirectionCard(
             Spacer(Modifier.weight(1f))
             Text(
                 text = when {
-                    targetLang != "en" -> "本地演示"
+                    fastReady && targetLang == "zh" &&
+                        (sourceLang == "ja" || sourceLang == "ko" || sourceLang == "en") ->
+                        "SenseVoice + Qwen"
                     fastReady -> "Sherpa + Qwen 流式"
+                    targetLang == "zh" && (sourceLang == "fr" || sourceLang == "ru") ->
+                        "法/俄暂不支持"
                     else -> "模型未就绪"
                 },
                 color = TextTertiary,
@@ -425,10 +429,10 @@ private fun DirectionCard(
             )
         }
 
-        if (targetLang == "en" && !fastReady) {
+        if (!fastReady && !(targetLang == "zh" && (sourceLang == "fr" || sourceLang == "ru"))) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "未检测到流式模型（models/sherpa-zh-en + Qwen gguf），启动后会回退到演示引擎",
+                text = "未检测到对应的 ASR 模型或 Qwen gguf，启动后会回退到演示引擎",
                 color = Warning,
                 fontSize = 10f.sp,
                 lineHeight = 15.sp,

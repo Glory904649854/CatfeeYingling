@@ -88,30 +88,26 @@ fun SettingsScreen(vm: MainViewModel) {
             EngineRow(
                 title = "Demo 引擎（内置）",
                 subtitle = "按音量模拟断句，用于跑通 UI 与采集链路",
-                selected = !(vm.targetLang == "en" && vm.fastReady),
+                selected = !vm.fastReady,
                 planned = false,
-                onClick = { vm.selectTargetLang("zh") },
+                onClick = {},
             )
             HairLine()
             EngineRow(
-                title = "Sherpa + Qwen（流式中 → 英）",
+                title = "多语种流式（Sherpa / SenseVoice + Qwen）",
                 subtitle = if (vm.fastReady) {
-                    "流式识别 + 逐句翻译 · 约 1.5~3 秒"
+                    "中/英/日/韩 → 中文，中 → 英 · 约 1.5~3 秒"
                 } else {
-                    "未找到 models/sherpa-zh-en 或 Qwen gguf"
+                    "未找到对应的 ASR 模型或 Qwen 模型"
                 },
-                selected = vm.targetLang == "en" && vm.fastReady,
+                selected = vm.fastReady,
                 planned = false,
                 onClick = {
-                    if (vm.fastReady) {
-                        vm.selectTargetLang("en")
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "请先把 sherpa-zh-en 目录与 Qwen gguf 放入应用 models 目录",
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
+                    Toast.makeText(
+                        context,
+                        "在实时页选择源语言和目标语言即可",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 },
             )
             HairLine()

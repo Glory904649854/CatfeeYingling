@@ -9,8 +9,8 @@ internal object QwenBridge {
 
     external fun nativeInit(modelPath: String): Long
 
-    /** 中文 -> 英文。失败返回空串。 */
-    external fun nativeTranslate(handle: Long, text: String): String
+    /** 文本翻译。targetLang: "zh" 或 "en"。失败返回空串。 */
+    external fun nativeTranslate(handle: Long, text: String, targetLang: String): String
 
     external fun nativeRelease(handle: Long)
 }

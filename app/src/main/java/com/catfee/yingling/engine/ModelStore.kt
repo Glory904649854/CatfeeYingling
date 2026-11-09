@@ -22,6 +22,16 @@ object ModelStore {
         return SherpaModel(encoder, decoder, joiner, tokens)
     }
 
+    /** SenseVoice 多语种离线模型（中英日韩粤）。 */
+    fun findSenseVoiceModel(context: Context): SenseVoiceModel? {
+        val dir = File(modelsDir(context), "sensevoice")
+        val model = File(dir, "model.int8.onnx").takeIf { it.isFile && it.length() > 10_000_000L }
+            ?: dir.listFiles()?.firstOrNull { it.isFile && it.name.endsWith(".onnx") && it.length() > 10_000_000L }
+            ?: return null
+        val tokens = File(dir, "tokens.txt").takeIf { it.isFile } ?: return null
+        return SenseVoiceModel(model, tokens)
+    }
+
     /** Qwen GGUF 文本翻译模型。 */
     fun findQwenModel(context: Context): File? =
         modelsDir(context).listFiles()

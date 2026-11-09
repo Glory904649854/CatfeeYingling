@@ -127,7 +127,7 @@ Java_com_catfee_yingling_engine_QwenBridge_nativeInit(
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_catfee_yingling_engine_QwenBridge_nativeTranslate(
-        JNIEnv *env, jobject /* thiz */, jlong handle, jstring text) {
+        JNIEnv *env, jobject /* thiz */, jlong handle, jstring text, jstring targetLang) {
     auto *qc = reinterpret_cast<QwenCtx *>(handle);
     if (qc == nullptr || text == nullptr) return env->NewStringUTF("");
 
@@ -136,10 +136,23 @@ Java_com_catfee_yingling_engine_QwenBridge_nativeTranslate(
     if (raw != nullptr) env->ReleaseStringUTFChars(text, raw);
     if (input.empty()) return env->NewStringUTF("");
 
+    std::string target = "en";
+    if (targetLang != nullptr) {
+        const char *lang = env->GetStringUTFChars(targetLang, nullptr);
+        if (lang != nullptr) {
+            target = lang;
+            env->ReleaseStringUTFChars(targetLang, lang);
+        }
+    }
+
+    const std::string system = target == "zh"
+        ? "Translate the user sentence into Simplified Chinese. "
+          "Output only the Chinese translation, no English, no quotes."
+        : "Translate the Chinese subtitle into concise English. "
+          "Output only the translation, no Chinese, no quotes.";
+
     const std::string prompt =
-        "<|im_start|>system\n"
-        "Translate the Chinese subtitle into concise English. "
-        "Output only the translation, no Chinese, no quotes.<|im_end|>\n"
+        "<|im_start|>system\n" + system + "<|im_end|>\n"
         "<|im_start|>user\n" + input + "<|im_end|>\n"
         "<|im_start|>assistant\n";
 

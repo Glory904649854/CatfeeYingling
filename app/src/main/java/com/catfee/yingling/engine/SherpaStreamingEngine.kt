@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SherpaStreamingEngine(
     private val model: SherpaModel,
     private val qwenModelPath: String,
+    private val targetLanguage: String,
 ) : RecognitionEngine {
 
     override val name: String = "Sherpa + Qwen"
@@ -151,16 +152,18 @@ class SherpaStreamingEngine(
     private fun runTranslation(text: String) {
         try {
             val begin = SystemClock.elapsedRealtime()
-            val english = try {
-                QwenBridge.nativeTranslate(qwenHandle, text)
+            val translated = try {
+                QwenBridge.nativeTranslate(qwenHandle, text, targetLanguage)
             } catch (t: Throwable) {
                 Log.e(TAG, "translate failed", t)
                 ""
-            }.let(::cleanTranslation)
+            }.let { cleanTranslation(it, targetLanguage)
+
+            }
             val elapsed = SystemClock.elapsedRealtime() - begin
-            Log.d(TAG, "translate ${text.length} chars -> ${elapsed}ms: $english")
-            if (english.isNotBlank()) {
-                onResult?.invoke(RecognitionResult(text, english, "en"))
+            Log.d(TAG, "translate ${text.length} chars -> ${elapsed}ms: $translated")
+            if (translated.isNotBlank()) {
+                onResult?.invoke(RecognitionResult(text, translated, targetLanguage))
             }
         } finally {
             mtBusy.set(false)
@@ -170,19 +173,26 @@ class SherpaStreamingEngine(
         }
     }
 
-    private fun cleanTranslation(raw: String): String {
+    private fun cleanTranslation(raw: String, target: String): String {
         var text = raw.trim()
         text = text.replace(
             Regex("(?i)^(sure[,，]?\\s*)?(here is the translation[:：]?\\s*)"),
             "",
         )
         text = text.replace(Regex("(?i)^translation[:：]\\s*"), "")
-        text = text.replace(Regex("(?i)^english[:：]\\s*"), "")
+        text = text.replace(Regex("(?i)^(english|chinese)[:：]\\s*"), "")
         text = text.trim().trim('"', '\'', '“', '”', '\n', ' ')
 
-        // 模型偶尔会把中文原样吐回来；这种情况宁可保留上一条英文，也不显示中文
-        if (text.isNotEmpty() && cjkRatio(text) > 0.2f) {
+        // 目标英文时，模型偶尔会把中文原样吐回来；这种情况宁可保留上一条英文
+        if (target == "en" && text.isNotEmpty() && cjkRatio(text) > 0.2f) {
             Log.w(TAG, "drop Chinese output: $text")
+            return ""
+        }
+        // 目标中文却输出纯英文，说明没有真正翻译，丢弃
+        if (target == "zh" && text.isNotEmpty() &&
+            text.none { it.code in 0x4E00..0x9FFF }
+        ) {
+            Log.w(TAG, "drop non-Chinese output: $text")
             return ""
         }
         return text

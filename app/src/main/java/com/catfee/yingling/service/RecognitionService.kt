@@ -30,6 +30,7 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.engine.DemoRecognitionEngine
 import com.catfee.yingling.engine.ModelStore
+import com.catfee.yingling.engine.SenseVoiceEngine
 import com.catfee.yingling.engine.SherpaStreamingEngine
 import com.catfee.yingling.engine.RecognitionEngine
 import com.catfee.yingling.engine.RecognitionResult
@@ -182,22 +183,48 @@ class RecognitionService : Service() {
     }
 
     private fun buildEngine(): RecognitionEngine {
-        val engine = if (prefs.targetLang == "en") {
-            val sherpaModel = ModelStore.findSherpaModel(this)
-            val qwenModel = ModelStore.findQwenModel(this)
-
-            if (sherpaModel != null && qwenModel != null) {
-                SherpaStreamingEngine(
-                    model = sherpaModel,
-                    qwenModelPath = qwenModel.absolutePath,
-                )
-            } else {
-                AppState.lastError.value =
-                    "未找到流式模型：请放入 models/sherpa-zh-en 与 Qwen gguf"
-                DemoRecognitionEngine(prefs.sourceLang)
-            }
-        } else {
+        val qwen = ModelStore.findQwenModel(this)
+        val engine = if (qwen == null) {
+            AppState.lastError.value = "未找到 Qwen 翻译模型"
             DemoRecognitionEngine(prefs.sourceLang)
+        } else {
+            when {
+                prefs.targetLang == "en" -> {
+                    val sherpa = ModelStore.findSherpaModel(this)
+                    if (sherpa != null) {
+                        SherpaStreamingEngine(sherpa, qwen.absolutePath, "en")
+                    } else {
+                        AppState.lastError.value = "未找到 sherpa-zh-en 模型"
+                        DemoRecognitionEngine(prefs.sourceLang)
+                    }
+                }
+
+                prefs.sourceLang == "ja" || prefs.sourceLang == "ko" ||
+                    prefs.sourceLang == "en" -> {
+                    val sense = ModelStore.findSenseVoiceModel(this)
+                    if (sense != null) {
+                        SenseVoiceEngine(sense, qwen.absolutePath, prefs.sourceLang, "zh")
+                    } else {
+                        AppState.lastError.value = "未找到 SenseVoice 模型"
+                        DemoRecognitionEngine(prefs.sourceLang)
+                    }
+                }
+
+                prefs.sourceLang == "fr" || prefs.sourceLang == "ru" -> {
+                    AppState.lastError.value = "法语/俄语语音识别暂未接入"
+                    DemoRecognitionEngine(prefs.sourceLang)
+                }
+
+                else -> {
+                    val sherpa = ModelStore.findSherpaModel(this)
+                    if (sherpa != null) {
+                        SherpaStreamingEngine(sherpa, qwen.absolutePath, "zh")
+                    } else {
+                        AppState.lastError.value = "未找到 sherpa-zh-en 模型"
+                        DemoRecognitionEngine(prefs.sourceLang)
+                    }
+                }
+            }
         }
         engine.onResult = ::publishResult
         return engine

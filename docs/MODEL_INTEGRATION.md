@@ -66,15 +66,52 @@ stream.acceptWaveform(samples, 16_000)
 
 ---
 
-## 2. Qwen 翻译
+## 2. SenseVoice（日/韩/英 → 中文）
 
 ### 2.1 模型
+
+```
+models/sensevoice/
+  model.int8.onnx   # 239MB
+  tokens.txt
+```
+
+下载：<https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17>
+
+### 2.2 配置
+
+```kotlin
+OfflineRecognizerConfig(
+    featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
+    modelConfig = OfflineModelConfig(
+        senseVoice = OfflineSenseVoiceModelConfig(
+            model = ".../model.int8.onnx",
+            language = "ja",          // ja / ko / en / zh / yue / auto
+            useInverseTextNormalization = true,
+        ),
+        tokens = ".../tokens.txt",
+        numThreads = 2,
+        modelType = "sense_voice",
+    ),
+)
+```
+
+### 2.3 注意点
+
+- 绝对路径加载时 `AssetManager` 必须为 null（与流式模型一致）。
+- `OfflineStream.acceptWaveform(samples, 16_000)`，第二个参数是采样率。
+- SenseVoice 非流式：用能量 VAD 切成 1~6 秒语音段后整段识别。
+- 识别速度很快，Redmi Note 9 上 6 秒音频的解码基本无感。
+
+## 3. Qwen 翻译
+
+### 3.1 模型
 
 `Qwen2.5-0.5B-Instruct-GGUF`，Q4_K_M，约 491MB：
 
 <https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct-GGUF>
 
-### 2.2 推理参数
+### 3.2 推理参数
 
 `cpp/llama_jni.cpp`：
 
@@ -84,7 +121,7 @@ stream.acceptWaveform(samples, 16_000)
 - 每次翻译前清空 KV cache，保证不同句子互不影响
 - 编译启用 `-O3` 与 `-march=armv8.2-a+dotprod+fp16`
 
-### 2.3 Prompt
+### 3.3 Prompt
 
 ```
 <|im_start|>system
@@ -96,7 +133,7 @@ Translate the Chinese subtitle into concise English. Output only the translation
 
 0.5B 仍可能输出 “Sure, here is the translation:” 或引号，Kotlin 侧 `cleanTranslation()` 会清理。
 
-### 2.4 性能实测
+### 3.4 性能实测
 
 | 中文长度 | 耗时 |
 |---|---|
@@ -118,7 +155,7 @@ Translate the Chinese subtitle into concise English. Output only the translation
 
 ---
 
-## 3. 语言方向
+## 4. 目标语言
 
 当前只支持目标 = 英语。源语言建议在 UI 锁定为中文；`sourceLanguage` 传给 Qwen 仅用于提示，不影响模型本身。
 
@@ -128,11 +165,23 @@ Translate the Chinese subtitle into concise English. Output only the translation
 
 ---
 
-## 4. 许可
+## 5. 语言路由
+
+`RecognitionService.buildEngine()`：
+
+| 目标 | 源语言 | 引擎 |
+|---|---|---|
+| 英语 | 中/英/auto | Sherpa 流式 zipformer + Qwen(en) |
+| 中文 | 日/韩/英 | SenseVoice + Qwen(zh) |
+| 中文 | 中/auto | Sherpa 流式 zipformer + Qwen(zh) |
+| 中文 | 法/俄 | 暂不支持 |
+
+## 6. 许可
 
 | 组件 | License |
 |---|---|
 | sherpa-onnx | Apache-2.0 |
+| SenseVoice | MIT（模型卡为准） |
 | llama.cpp | MIT |
 | Qwen2.5 | Apache-2.0 |
 | 本仓库代码 | 未声明（自行补充） |
