@@ -13,6 +13,8 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.data.AppCatalog
 import com.catfee.yingling.data.AppEntry
+import com.catfee.yingling.engine.CloudClient
+import com.catfee.yingling.engine.CloudLlmConfig
 import com.catfee.yingling.engine.ModelCatalog
 import com.catfee.yingling.engine.ModelDownloader
 import com.catfee.yingling.engine.ModelStore
@@ -56,6 +58,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var cloudModel by mutableStateOf("")
         private set
     var cloudExtraJson by mutableStateOf("")
+        private set
+    var modelOptions by mutableStateOf<List<String>>(emptyList())
+        private set
+    var modelListLoading by mutableStateOf(false)
+        private set
+    var modelListError by mutableStateOf<String?>(null)
+        private set
+    var modelPickerVisible by mutableStateOf(false)
+        private set
+    var cloudTestRunning by mutableStateOf(false)
+        private set
+    var cloudTestResult by mutableStateOf<String?>(null)
+        private set
+    var cloudTestSuccess by mutableStateOf<Boolean?>(null)
         private set
     var subtitleHoldSeconds by mutableStateOf(prefs.subtitleHoldSeconds)
         private set
@@ -224,23 +240,114 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateCloudBaseUrl(value: String) {
         cloudBaseUrl = value
+        clearCloudProbe()
     }
 
     fun updateCloudApiKey(value: String) {
         cloudApiKey = value
+        clearCloudProbe()
     }
 
     fun updateCloudModel(value: String) {
         cloudModel = value
+        clearCloudProbe()
     }
 
     fun updateCloudExtraJson(value: String) {
         cloudExtraJson = value
+        clearCloudProbe()
+    }
+
+    fun fetchModels() {
+        saveDraft()
+        val config = draftConfig(requireModel = false)
+        modelOptions = emptyList()
+        modelListError = null
+        modelPickerVisible = true
+        if (config == null) {
+            modelListError = "请先填写 Base URL 和 API Key"
+            return
+        }
+
+        modelListLoading = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { CloudClient.listModels(config) }
+            }
+            modelListLoading = false
+            result.onSuccess { options ->
+                modelOptions = options
+                if (options.isEmpty()) {
+                    modelListError = "接口没有返回模型"
+                }
+            }.onFailure { error ->
+                modelListError = error.message?.takeIf { it.isNotBlank() } ?: "拉取模型失败"
+            }
+        }
+    }
+
+    fun dismissModelPicker() {
+        modelPickerVisible = false
+    }
+
+    fun selectCloudModel(model: String) {
+        cloudModel = model
+        clearCloudProbe()
+        saveDraft()
+        refreshReady()
+        if (isSessionActive()) RecognitionService.refresh(context)
+    }
+
+    fun testProvider() {
+        saveDraft()
+        val config = draftConfig(requireModel = true)
+        cloudTestResult = null
+        cloudTestSuccess = null
+        if (config == null) {
+            cloudTestSuccess = false
+            cloudTestResult = "请先填写 Base URL、API Key 和模型"
+            return
+        }
+
+        cloudTestRunning = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { CloudClient.test(config) }
+            cloudTestRunning = false
+            cloudTestSuccess = result.ok
+            cloudTestResult = if (result.ok) {
+                "拨测成功 · ${result.elapsedMs}ms · ${result.message}"
+            } else {
+                "拨测失败 · ${result.elapsedMs}ms · ${result.message}"
+            }
+        }
+    }
+
+    private fun draftConfig(requireModel: Boolean): CloudLlmConfig? {
+        val base = cloudBaseUrl.trim()
+        val key = cloudApiKey.trim()
+        val model = cloudModel.trim()
+        if (base.isBlank() || key.isBlank()) return null
+        if (requireModel && model.isBlank()) return null
+        return CloudLlmConfig(
+            baseUrl = base,
+            apiKey = key,
+            model = model,
+            extraJson = cloudExtraJson.trim(),
+        )
+    }
+
+    private fun clearCloudProbe() {
+        modelOptions = emptyList()
+        modelListError = null
+        modelPickerVisible = false
+        cloudTestResult = null
+        cloudTestSuccess = null
     }
 
     fun selectProvider(id: String) {
         if (id == activeProviderId) return
         saveDraft()
+        clearCloudProbe()
         activateProvider(id)
         refreshReady()
         if (isSessionActive()) RecognitionService.refresh(context)
@@ -248,6 +355,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addProvider() {
         saveDraft()
+        clearCloudProbe()
         val provider = CloudProvider(
             id = UUID.randomUUID().toString(),
             name = "供应商 ${providers.size + 1}",
@@ -264,6 +372,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteActiveProvider() {
         if (providers.size <= 1) return
+        clearCloudProbe()
         val remaining = providers.filterNot { it.id == activeProviderId }
         providers = remaining
         prefs.saveCloudProviders(remaining)

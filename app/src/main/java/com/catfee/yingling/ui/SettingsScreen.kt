@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -49,6 +50,7 @@ import com.catfee.yingling.core.Prefs
 import com.catfee.yingling.core.SessionStatus
 import com.catfee.yingling.service.RecognitionService
 import com.catfee.yingling.ui.components.HairLine
+import com.catfee.yingling.ui.components.GhostAction
 import com.catfee.yingling.ui.components.ModelSetupCard
 import com.catfee.yingling.ui.components.SectionCard
 import com.catfee.yingling.ui.components.SectionTitle
@@ -241,6 +243,30 @@ fun SettingsScreen(vm: MainViewModel) {
                 onValueChange = vm::updateCloudExtraJson,
                 placeholder = "{\"enable_thinking\": false}",
             )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GhostAction(
+                    text = if (vm.modelListLoading) "拉取中…" else "拉取模型",
+                    enabled = !vm.modelListLoading,
+                    onClick = vm::fetchModels,
+                    modifier = Modifier.weight(1f),
+                )
+                GhostAction(
+                    text = if (vm.cloudTestRunning) "拨测中…" else "拨测",
+                    enabled = !vm.cloudTestRunning,
+                    onClick = vm::testProvider,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            vm.cloudTestResult?.let { result ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = result,
+                    color = if (vm.cloudTestSuccess == true) Cyan else Danger,
+                    fontSize = 10.5.sp,
+                    lineHeight = 15.sp,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Box(
                 Modifier
@@ -308,6 +334,56 @@ fun SettingsScreen(vm: MainViewModel) {
                 dismissButton = {
                     TextButton(onClick = { showDeleteDialog = false }) {
                         Text("取消")
+                    }
+                },
+            )
+        }
+
+        if (vm.modelPickerVisible) {
+            val modelError = vm.modelListError
+            AlertDialog(
+                onDismissRequest = vm::dismissModelPicker,
+                title = { Text("选择模型") },
+                text = {
+                    when {
+                        vm.modelListLoading -> {
+                            Text("正在拉取模型列表…")
+                        }
+
+                        modelError != null -> {
+                            Text(modelError, color = Danger)
+                        }
+
+                        else -> {
+                            Column(
+                                Modifier
+                                    .heightIn(max = 360.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                Text(
+                                    text = "共 ${vm.modelOptions.size} 个模型",
+                                    color = TextTertiary,
+                                    fontSize = 10.5.sp,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                vm.modelOptions.forEach { model ->
+                                    Text(
+                                        text = model,
+                                        color = if (model == vm.cloudModel) Cyan else TextPrimary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { vm.selectCloudModel(model) }
+                                            .padding(vertical = 8.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = vm::dismissModelPicker) {
+                        Text("关闭")
                     }
                 },
             )
